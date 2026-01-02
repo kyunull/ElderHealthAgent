@@ -22,9 +22,7 @@
   "mood_records": [],
   "psych_assessments": [],
   "psych_dialogue_sessions": [],
-  "records": [
-
-  ],
+  "records": [  ],
   "last_updated": null,
   "statistics": {
     "total_records": 0,
