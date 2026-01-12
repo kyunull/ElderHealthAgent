@@ -12,7 +12,9 @@
 
 **GitHub**: https://github.com/huifer/Claude-Ally-Health
 
-> Note: 项目使用到 GLM 提供的 mcp__4_5v_mcp__analyze_image 。
+> **⚠️ 免责声明**: 本项目与 [Anthropic](https://www.anthropic.com/) 或 [Claude.ai](https://claude.ai/) **没有任何关联、背书或从属关系**。本项目是由 [WellAlly Tech](https://www.wellally.tech/) 独立开发的独立开源项目。
+>
+> **📝 Note**: 项目使用到 GLM 提供的 mcp__4_5v_mcp__analyze_image 。
 ## 项目开发方
 
 本项目由 [WellAlly Tech](https://www.wellally.tech/) 开发和维护。

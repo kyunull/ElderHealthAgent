@@ -12,7 +12,9 @@ A file-based personal health data management system using Claude Code CLI tools 
 
 **GitHub**: https://github.com/huifer/Claude-Ally-Health
 
-> Note: This project uses GLM's `mcp__4_5v_mcp__analyze_image` for image recognition.
+> **⚠️ Disclaimer**: This project is NOT affiliated with, endorsed by, or associated with [Anthropic](https://www.anthropic.com/) or [Claude.ai](https://claude.ai/). This is an independent open-source project developed by [WellAlly Tech](https://www.wellally.tech/).
+>
+> **📝 Note**: This project uses GLM's `mcp__4_5v_mcp__analyze_image` for image recognition.
 
 ## Project Developer
 
