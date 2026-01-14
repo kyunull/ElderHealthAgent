@@ -106,6 +106,76 @@
       "fruit_servings_avg": 2.0,
       "diet_quality_score": 7.2
     },
+    "weight_loss_energy": {
+      "calorie_target": null,
+      "deficit_target": null,
+      "daily_tracking": {
+        "date": null,
+        "intake_calories": null,
+        "exercise_burn": null,
+        "neat_burn": null,
+        "deficit_achieved": null,
+        "deficit_target_met": null
+      },
+      "daily_history": [],
+      "weekly_summary": {
+        "week_start": null,
+        "avg_intake": null,
+        "avg_burn": null,
+        "avg_deficit": null,
+        "days_on_target": null,
+        "days_off_target": null,
+        "estimated_weight_loss_kg": null
+      },
+      "macros_target": {
+        "protein": {"grams": null, "calories": null, "percentage": 30},
+        "carbs": {"grams": null, "calories": null, "percentage": 40},
+        "fat": {"grams": null, "calories": null, "percentage": 30}
+      },
+      "intermittent_fasting": {
+        "enabled": false,
+        "method": "16_8",
+        "eating_window_start": "12:00",
+        "eating_window_end": "20:00",
+        "fasting_window_start": "20:00",
+        "fasting_window_end": "12:00"
+      }
+    },
+    "weight_loss_meal_plan": {
+      "approach": "balanced_deficit",
+      "meals_per_day": 4,
+      "timing": ["08:00", "12:00", "16:00", "20:00"],
+      "structure": {
+        "breakfast": {
+          "calories": 450,
+          "protein": 30,
+          "carbs": 50,
+          "fat": 15,
+          "example": "鸡蛋2个 + 燕麦50g + 牛奶250ml"
+        },
+        "lunch": {
+          "calories": 600,
+          "protein": 40,
+          "carbs": 60,
+          "fat": 20,
+          "example": "鸡胸肉150g + 糙米150g + 蔬菜200g"
+        },
+        "snack": {
+          "calories": 200,
+          "protein": 15,
+          "carbs": 15,
+          "fat": 10,
+          "example": "希腊酸奶100g + 坚果20g"
+        },
+        "dinner": {
+          "calories": 550,
+          "protein": 45,
+          "carbs": 45,
+          "fat": 18,
+          "example": "鱼肉150g + 红薯150g + 蔬菜200g"
+        }
+      }
+    },
     "metadata": {
       "created_at": "2025-05-20T00:00:00.000Z",
       "last_updated": "2025-06-20T20:00:00.000Z",
