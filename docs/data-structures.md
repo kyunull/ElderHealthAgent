@@ -100,6 +100,7 @@
 ```json
 {
   "basic_info": {
+    "gender": "F",
     "height": 175,
     "height_unit": "cm",
     "weight": 70,
@@ -118,6 +119,7 @@
 
 ### 字段说明
 - `basic_info`: 基础信息对象
+  - `gender`: 性别（M=男性，F=女性，其他值可选）
   - `height`: 身高数值
   - `height_unit`: 身高单位
   - `weight`: 体重数值
@@ -507,3 +509,419 @@
   ]
 }
 ```
+
+---
+
+## 儿童意外伤害预防数据结构
+
+```json
+{
+  "created_at": "2025-01-14T00:00:00.000Z",
+  "last_updated": "2025-01-14T10:00:00.000Z",
+
+  "child_profile": {
+    "child_id": "child_20200101",
+    "name": "小明",
+    "birth_date": "2020-01-01",
+    "gender": "male"
+  },
+
+  "safety_assessments": [
+    {
+      "date": "2025-01-14",
+      "age": "2y5m",
+      "age_months": 29,
+      "area": "home",
+      "area_name": "家庭安全",
+
+      "checklist": {
+        "window_protection": {
+          "item": "窗户防护",
+          "safe": true,
+          "notes": "已安装限位器"
+        },
+        "outlet_covers": {
+          "item": "插座保护",
+          "safe": true,
+          "notes": "所有插座已安装保护盖"
+        },
+        "chemical_storage": {
+          "item": "化学品收纳",
+          "safe": false,
+          "notes": "药品放在低处，需移至带锁高处"
+        }
+      },
+
+      "score": {
+        "total_items": 5,
+        "safe_items": 4,
+        "percentage": 80,
+        "level": "good"
+      },
+
+      "risks_identified": [
+        {
+          "item": "chemical_storage",
+          "risk_level": "high",
+          "description": "药品未安全存放"
+        }
+      ]
+    }
+  ],
+
+  "emergency_contacts": [
+    { "name": "爸爸", "phone": "138****1234", "relationship": "father" },
+    { "name": "妈妈", "phone": "139****5678", "relationship": "mother" }
+  ]
+}
+```
+
+### 字段说明
+- `child_profile`: 儿童基础信息
+- `safety_assessments`: 安全评估记录数组
+- `area`: 评估区域（home/car/water/food/outdoor）
+- `checklist`: 安全检查项目
+- `score`: 安全评分
+- `risks_identified`: 识别的风险数组
+- `emergency_contacts`: 紧急联系人
+
+---
+
+## 儿童发育里程碑数据结构
+
+```json
+{
+  "created_at": "2025-01-14T00:00:00.000Z",
+  "last_updated": "2025-01-14T10:00:00.000Z",
+
+  "child_profile": {
+    "child_id": "child_20200101",
+    "name": "小明",
+    "birth_date": "2020-01-01",
+    "gender": "male",
+    "premature": false
+  },
+
+  "developmental_tracking": {
+    "assessments": [
+      {
+        "date": "2025-01-14",
+        "age_months": 6,
+
+        "gross_motor": {
+          "items": [
+            {
+              "milestone": "独坐",
+              "age_expected": 6,
+              "achieved": true,
+              "age_achieved": 5,
+              "date_achieved": "2020-06-01"
+            }
+          ],
+          "status": "normal"
+        },
+
+        "fine_motor": {
+          "items": [
+            {
+              "milestone": "拇食指捏物",
+              "age_expected": 9,
+              "achieved": false
+            }
+          ],
+          "status": "normal"
+        }
+      }
+    ]
+  }
+}
+```
+
+### 字段说明
+- `gross_motor`: 大运动发育
+- `fine_motor`: 精细动作发育
+- `language`: 语言发育
+- `social`: 社交发育
+- `cognitive`: 认知发育
+- `milestone`: 里程碑名称
+- `age_expected`: 预期达成月龄
+- `achieved`: 是否已达成
+- `age_achieved`: 实际达成月龄
+
+---
+
+## 儿童疾病管理数据结构
+
+```json
+{
+  "created_at": "2025-01-14T00:00:00.000Z",
+  "last_updated": "2025-01-14T10:00:00.000Z",
+
+  "child_profile": {
+    "child_id": "child_20200101",
+    "name": "小明",
+    "birth_date": "2020-01-01",
+    "gender": "male"
+  },
+
+  "illness_records": [
+    {
+      "id": "illness_20250112",
+      "date": "2025-01-12",
+      "onset_date": "2025-01-12",
+      "days_illness": 3,
+
+      "condition": {
+        "name": "急性上呼吸道感染",
+        "category": "respiratory",
+        "severity": "mild"
+      },
+
+      "symptoms": [
+        {
+          "name": "发热",
+          "severity": "moderate",
+          "status": "improving"
+        }
+      ],
+
+      "fever_tracking": [
+        {
+          "date": "2025-01-12T18:00:00",
+          "temperature": 38.2,
+          "medication": null
+        }
+      ],
+
+      "medications": [
+        {
+          "name": "布洛芬混悬液",
+          "dosage": "5ml",
+          "frequency": "按需"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 字段说明
+- `condition`: 疾病信息
+- `category`: 疾病类别（respiratory/digestive等）
+- `severity`: 严重程度（mild/moderate/severe）
+- `fever_tracking`: 体温追踪记录
+- `medications`: 用药记录
+
+---
+
+## 儿童睡眠管理数据结构
+
+```json
+{
+  "created_at": "2025-01-14T00:00:00.000Z",
+  "last_updated": "2025-01-14T10:00:00.000Z",
+
+  "child_profile": {
+    "child_id": "child_20200101",
+    "name": "小明",
+    "birth_date": "2020-01-01",
+    "gender": "male"
+  },
+
+  "sleep_records": [
+    {
+      "date": "2025-01-13",
+      "age_months": 29,
+
+      "night_sleep": {
+        "bedtime": "21:00",
+        "fall_asleep_time": "21:30",
+        "wake_time": "07:00",
+        "total_sleep_hours": 9.5,
+        "sleep_quality": "good"
+      },
+
+      "night_wakeups": {
+        "count": 1,
+        "durations_minutes": [10],
+        "reasons": ["口渴"]
+      },
+
+      "day_sleep": {
+        "naps": 1,
+        "total_nap_sleep": 2
+      },
+
+      "total_sleep": {
+        "hours": 11.5,
+        "within_recommended": true
+      }
+    }
+  ],
+
+  "sleep_problems": {
+    "night_terrors": false,
+    "bedwetting": false,
+    "sleep_walking": false
+  }
+}
+```
+
+### 字段说明
+- `night_sleep`: 夜间睡眠
+- `night_wakeups`: 夜醒记录
+- `day_sleep`: 白天小睡
+- `total_sleep`: 总睡眠时长
+- `sleep_problems`: 睡眠问题标记
+
+---
+
+## 儿童营养饮食数据结构
+
+```json
+{
+  "created_at": "2025-01-14T00:00:00.000Z",
+  "last_updated": "2025-01-14T10:00:00.000Z",
+
+  "child_profile": {
+    "child_id": "child_20200101",
+    "name": "小明",
+    "birth_date": "2020-01-01",
+    "gender": "male"
+  },
+
+  "dietary_records": [
+    {
+      "date": "2025-01-14",
+      "age_months": 29,
+
+      "meals": {
+        "breakfast": {
+          "time": "08:00",
+          "foods": [
+            {
+              "name": "牛奶",
+              "amount": "200ml",
+              "category": "dairy"
+            }
+          ]
+        },
+        "lunch": {
+          "time": "12:00",
+          "foods": [
+            {
+              "name": "米饭",
+              "amount": "1小碗",
+              "category": "grain"
+            }
+          ]
+        }
+      },
+
+      "water_intake": {
+        "amount_ml": 800,
+        "recommended_min": 1000,
+        "adequate": false
+      },
+
+      "nutrition_assessment": {
+        "protein": "adequate",
+        "calcium": "adequate",
+        "iron": "adequate",
+        "vitamin_d": "supplement_recommended"
+      }
+    }
+  ],
+
+  "picky_eating": {
+    "level": "mild",
+    "refused_foods": ["胡萝卜", "青椒"],
+    "preferred_foods": ["鸡肉", "水果"]
+  }
+}
+```
+
+### 字段说明
+- `meals`: 每餐记录
+- `category`: 食物类别（grain/protein/vegetable/fruit/dairy）
+- `water_intake`: 饮水量
+- `nutrition_assessment`: 营养评估
+- `picky_eating`: 挑食评估
+
+---
+
+## 儿童心理健康数据结构
+
+```json
+{
+  "created_at": "2025-01-14T00:00:00.000Z",
+  "last_updated": "2025-01-14T10:00:00.000Z",
+
+  "child_profile": {
+    "child_id": "child_20200101",
+    "name": "小明",
+    "birth_date": "2020-01-01",
+    "gender": "male"
+  },
+
+  "assessments": [
+    {
+      "date": "2025-01-14",
+      "age_months": 60,
+
+      "mood_assessment": {
+        "overall_mood": "stable",
+        "mood_rating": 7,
+        "emotional_regulation": "good"
+      },
+
+      "behavior_assessment": {
+        "overall_behavior": "normal",
+        "activity_level": "appropriate",
+        "attention_span": "age_appropriate",
+        "aggression": "none"
+      },
+
+      "anxiety_screening": {
+        "overall_anxiety": "low_risk"
+      },
+
+      "attention_screening": {
+        "inattention_score": 8,
+        "hyperactivity_score": 5,
+        "total_score": 13
+      },
+
+      "overall_assessment": "normal"
+    }
+  ],
+
+  "mood_tracking": [
+    {
+      "date": "2025-01-14",
+      "mood": "happy",
+      "mood_rating": 7,
+      "context": "playing"
+    }
+  ],
+
+  "behavior_tracking": {
+    "tantrums": {
+      "frequency": "rare",
+      "triggers": ["hungry", "tired"]
+    },
+    "sleep_issues": false,
+    "aggression": false
+  }
+}
+```
+
+### 字段说明
+- `mood_assessment`: 情绪评估
+- `behavior_assessment`: 行为评估
+- `anxiety_screening`: 焦虑筛查
+- `attention_screening`: 注意力筛查（ADHD相关）
+- `mood_tracking`: 情绪追踪记录
+- `behavior_tracking`: 行为问题追踪
+
+---
