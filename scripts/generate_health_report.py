@@ -405,6 +405,140 @@ class HealthReportGenerator:
             "discharge_count": len(discharges)
         }
 
+    def collect_weight_loss_data(self, start_date: datetime, end_date: datetime) -> Dict:
+        """收集减肥数据"""
+        # 加载健身追踪数据
+        fitness_data = self.load_json("fitness-tracker.json")
+
+        # 加载营养追踪数据
+        nutrition_data = self.load_json("nutrition-tracker.json")
+
+        result = {
+            "has_data": False,
+            "body_composition": {},
+            "metabolic_profile": {},
+            "energy_balance": {},
+            "progress": {},
+            "weight_history": []
+        }
+
+        # 提取身体成分数据
+        if fitness_data:
+            wlp = fitness_data.get("fitness_tracking", {}).get("weight_loss_program", {})
+            body_comp = wlp.get("body_composition", {})
+
+            current = body_comp.get("current", {})
+            history = body_comp.get("history", [])
+            goals = body_comp.get("goals", {})
+            analysis = body_comp.get("analysis", {})
+
+            result["body_composition"] = {
+                "current_weight": current.get("weight_kg"),
+                "height": current.get("height_cm"),
+                "body_fat": current.get("body_fat_percentage"),
+                "muscle_mass": current.get("muscle_mass_kg"),
+                "waist": current.get("waist_cm"),
+                "hip": current.get("hip_cm"),
+                "target_weight": goals.get("target_weight_kg"),
+                "target_body_fat": goals.get("target_body_fat_percentage"),
+                "bmi": analysis.get("bmi"),
+                "bmi_category": analysis.get("bmi_category"),
+                "ideal_weight": analysis.get("ideal_weight"),
+                "weight_to_lose": analysis.get("weight_to_lose"),
+                "waist_hip_ratio": analysis.get("waist_hip_ratio"),
+                "abdominal_obesity": analysis.get("abdominal_obesity")
+            }
+
+            # 构建体重历史
+            for record in history:
+                result["weight_history"].append({
+                    "date": record.get("date"),
+                    "weight": record.get("weight_kg"),
+                    "body_fat": record.get("body_fat_percentage"),
+                    "muscle_mass": record.get("muscle_mass_kg")
+                })
+
+            # 按日期排序
+            result["weight_history"].sort(key=lambda x: x.get("date", ""))
+
+        # 提取代谢分析数据
+        if fitness_data:
+            wlp = fitness_data.get("fitness_tracking", {}).get("weight_loss_program", {})
+            metabolic = wlp.get("metabolic_profile", {})
+            personal = metabolic.get("personal_info", {})
+            bmr_calc = metabolic.get("bmr_calculations", {})
+            tdee_data = metabolic.get("tdee", {})
+            activity = metabolic.get("activity_level", {})
+
+            result["metabolic_profile"] = {
+                "gender": personal.get("gender"),
+                "age": personal.get("age"),
+                "bmr_harris": bmr_calc.get("harris_benedict", {}).get("bmr"),
+                "bmr_mifflin": bmr_calc.get("mifflin_st_jeor", {}).get("bmr"),
+                "bmr_katch": bmr_calc.get("katch_mcardle", {}).get("bmr"),
+                "tdee": tdee_data.get("calories"),
+                "activity_level": activity.get("current"),
+                "activity_factor": activity.get("factor")
+            }
+
+        # 提取能量平衡数据
+        if nutrition_data:
+            wle = nutrition_data.get("nutrition_tracking", {}).get("weight_loss_energy", {})
+            daily_tracking = wle.get("daily_tracking", {})
+            weekly_summary = wle.get("weekly_summary", {})
+            daily_history = wle.get("daily_history", [])
+
+            result["energy_balance"] = {
+                "calorie_target": wle.get("calorie_target"),
+                "deficit_target": wle.get("deficit_target"),
+                "current_intake": daily_tracking.get("intake_calories"),
+                "exercise_burn": daily_tracking.get("exercise_burn"),
+                "deficit_achieved": daily_tracking.get("deficit_achieved"),
+                "avg_weekly_intake": weekly_summary.get("avg_intake"),
+                "avg_weekly_deficit": weekly_summary.get("avg_deficit"),
+                "estimated_weight_loss": weekly_summary.get("estimated_weight_loss_kg")
+            }
+
+            # 构建能量历史
+            result["energy_history"] = []
+            for record in daily_history:
+                if start_date.strftime("%Y-%m-%d") <= record.get("date", "") <= end_date.strftime("%Y-%m-%d"):
+                    result["energy_history"].append({
+                        "date": record.get("date"),
+                        "intake": record.get("intake_calories"),
+                        "burn": record.get("exercise_burn"),
+                        "deficit": record.get("deficit_achieved")
+                    })
+
+        # 提取进度数据
+        if fitness_data:
+            goals = fitness_data.get("fitness_tracking", {}).get("goals", {})
+            active_goals = goals.get("active_goals", [])
+
+            for goal in active_goals:
+                if goal.get("category") == "weight_loss":
+                    result["progress"] = {
+                        "baseline": goal.get("baseline_value"),
+                        "current": goal.get("current_value"),
+                        "target": goal.get("target_value"),
+                        "progress_pct": goal.get("progress"),
+                        "remaining": goal.get("remaining"),
+                        "status": goal.get("status"),
+                        "start_date": goal.get("start_date"),
+                        "target_date": goal.get("target_date")
+                    }
+                    break
+
+        # 判断是否有数据
+        result["has_data"] = bool(
+            result["body_composition"].get("current_weight") or
+            result["metabolic_profile"].get("tdee") or
+            result["energy_balance"].get("calorie_target") or
+            result["weight_history"]
+        )
+
+        return result
+
     def calculate_trend(self, values: List[float]) -> Dict:
         """
         计算趋势方向和幅度
@@ -625,7 +759,7 @@ class HealthReportGenerator:
         # 根据action确定默认章节
         if action == "comprehensive":
             sections = ["profile", "biochemical", "imaging", "medication",
-                       "radiation", "allergies", "symptoms", "surgeries", "discharge"]
+                       "radiation", "allergies", "symptoms", "surgeries", "discharge", "weight_loss"]
         elif action == "biochemical":
             sections = ["profile", "biochemical"]
         elif action == "imaging":
@@ -635,7 +769,7 @@ class HealthReportGenerator:
         elif action == "custom":
             if not sections or sections == ["all"]:
                 sections = ["profile", "biochemical", "imaging", "medication",
-                           "radiation", "allergies", "symptoms", "surgeries", "discharge"]
+                           "radiation", "allergies", "symptoms", "surgeries", "discharge", "weight_loss"]
 
         # 收集各章节数据
         if "profile" in sections:
@@ -673,6 +807,10 @@ class HealthReportGenerator:
         if "discharge" in sections:
             print("  - 收集出院小结...")
             self.report_data["discharge"] = self.collect_discharge_data(start_date, end_date)
+
+        if "weight_loss" in sections:
+            print("  - 收集减肥数据...")
+            self.report_data["weight_loss"] = self.collect_weight_loss_data(start_date, end_date)
 
         # 生成洞察
         print("正在生成洞察...")
@@ -1044,6 +1182,10 @@ class HealthReportGenerator:
         if self.report_data.get('discharge'):
             sections_html += self._render_discharge_section()
 
+        # 减肥章节
+        if self.report_data.get('weight_loss', {}).get('has_data'):
+            sections_html += self._render_weight_loss_section()
+
         return sections_html
 
     def _render_biochemical_section(self) -> str:
@@ -1282,6 +1424,144 @@ class HealthReportGenerator:
         </section>
         """
 
+    def _render_weight_loss_section(self) -> str:
+        """渲染减肥章节"""
+        data = self.report_data.get('weight_loss', {})
+        body_comp = data.get('body_composition', {})
+        metabolic = data.get('metabolic_profile', {})
+        energy = data.get('energy_balance', {})
+        progress = data.get('progress', {})
+        weight_history = data.get('weight_history', [])
+        energy_history = data.get('energy_history', [])
+
+        # 获取显示值或默认占位符
+        current_weight = body_comp.get('current_weight')
+        target_weight = body_comp.get('target_weight')
+        bmi = body_comp.get('bmi')
+        bmi_category = body_comp.get('bmi_category', '--')
+        body_fat = body_comp.get('body_fat')
+        target_body_fat = body_comp.get('target_body_fat')
+        deficit = energy.get('deficit_achieved')
+        deficit_target = energy.get('deficit_target')
+
+        # BMI分类中文映射
+        bmi_category_map = {
+            'underweight': '偏瘦',
+            'normal': '正常',
+            'overweight': '超重',
+            'obese': '肥胖'
+        }
+        bmi_category_cn = bmi_category_map.get(bmi_category, '--')
+
+        return f"""
+        <section id="weight-loss" class="mb-8">
+            <div class="flex items-center gap-2 mb-4">
+                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                </svg>
+                <h2 class="text-xl font-bold text-gray-800">科学运动健康减肥</h2>
+            </div>
+
+            <div class="bg-amber-50 border-l-4 border-amber-400 p-4 mb-6">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-amber-700">
+                            <strong>免责声明：</strong>本工具提供的减肥建议基于一般科学原理，不构成医疗诊断或处方。
+                            极端减重、进食障碍、肥胖相关疾病请咨询专业医师。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 身体成分概览 -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-sm text-gray-500">体重</div>
+                    <div class="text-2xl font-bold text-gray-800">{current_weight or '--'} kg</div>
+                    <div class="text-xs text-emerald-600 mt-1">目标: {target_weight or '--'} kg</div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-sm text-gray-500">BMI</div>
+                    <div class="text-2xl font-bold text-gray-800">{bmi or '--'}</div>
+                    <div class="text-xs text-gray-400 mt-1">分类: {bmi_category_cn}</div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-sm text-gray-500">体脂率</div>
+                    <div class="text-2xl font-bold text-gray-800">{body_fat or '--'}%</div>
+                    <div class="text-xs text-gray-400 mt-1">目标: {target_body_fat or '--'}%</div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-sm text-gray-500">能量缺口</div>
+                    <div class="text-2xl font-bold text-gray-800">{deficit or '--'} 大卡</div>
+                    <div class="text-xs text-gray-400 mt-1">目标: {deficit_target or '--'} 大卡</div>
+                </div>
+            </div>
+
+            <!-- 体重趋势图 -->
+            <div class="bg-white rounded-lg shadow p-4 mb-6">
+                <h3 class="text-lg font-semibold mb-4">体重变化趋势</h3>
+                <div class="chart-container">
+                    <canvas id="weightTrendChart" height="200"></canvas>
+                </div>
+                {f'<p class="text-sm text-gray-500 mt-2 text-center">共{len(weight_history)}条记录</p>' if weight_history else '<p class="text-sm text-gray-500 mt-2 text-center">暂无数据 - 请先记录体重数据</p>'}
+            </div>
+
+            <!-- 代谢分析 -->
+            <div class="bg-white rounded-lg shadow p-4 mb-6">
+                <h3 class="text-lg font-semibold mb-4">代谢分析</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="p-4 bg-blue-50 rounded">
+                        <div class="text-sm text-gray-500">基础代谢 (BMR)</div>
+                        <div class="text-xl font-bold text-blue-600">{metabolic.get('bmr_mifflin') or '--'} 大卡/天</div>
+                    </div>
+                    <div class="p-4 bg-green-50 rounded">
+                        <div class="text-sm text-gray-500">总能量消耗 (TDEE)</div>
+                        <div class="text-xl font-bold text-green-600">{metabolic.get('tdee') or '--'} 大卡/天</div>
+                    </div>
+                    <div class="p-4 bg-purple-50 rounded">
+                        <div class="text-sm text-gray-500">活动水平</div>
+                        <div class="text-xl font-bold text-purple-600">{metabolic.get('activity_level') or '--'}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 减肥进度 -->
+            {f'''
+            <div class="bg-white rounded-lg shadow p-4 mb-6">
+                <h3 class="text-lg font-semibold mb-4">减肥进度</h3>
+                <div class="mb-4">
+                    <div class="flex justify-between text-sm mb-2">
+                        <span>进度: {progress.get('progress_pct', 0)}%</span>
+                        <span>剩余: {progress.get('remaining', 0)} kg</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-4">
+                        <div class="bg-emerald-500 h-4 rounded-full" style="width: {progress.get('progress_pct', 0)}%"></div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                        <div class="text-sm text-gray-500">起始体重</div>
+                        <div class="text-lg font-bold">{progress.get('baseline') or '--'} kg</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-500">当前体重</div>
+                        <div class="text-lg font-bold">{progress.get('current') or '--'} kg</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-500">目标体重</div>
+                        <div class="text-lg font-bold">{progress.get('target') or '--'} kg</div>
+                    </div>
+                </div>
+            </div>
+            ''' if progress else ''}
+        </section>
+        """
+
     def _render_trend_charts(self, indicators: list, section: str) -> str:
         """渲染趋势图表"""
         charts_html = ""
@@ -1367,6 +1647,61 @@ class HealthReportGenerator:
                         fill: true,
                         tension: 0.3
                     }}]
+                }}
+            }});
+            """)
+
+        # 减肥体重趋势图
+        weight_loss = self.report_data.get('weight_loss', {})
+        weight_history = weight_loss.get('weight_history', [])
+        if weight_history:
+            weight_dates = [w.get('date', '') for w in weight_history]
+            weight_values = [w.get('weight', 0) for w in weight_history]
+
+            # 获取目标体重线
+            target_weight = weight_loss.get('body_composition', {}).get('target_weight')
+
+            # 构建数据集
+            datasets = [{
+                'label': '体重',
+                'data': weight_values,
+                'borderColor': '#10b981',
+                'backgroundColor': 'rgba(16, 185, 129, 0.1)',
+                'fill': True,
+                'tension': 0.3
+            }]
+
+            # 如果有目标体重，添加目标线
+            if target_weight:
+                target_line = [target_weight] * len(weight_values)
+                datasets.append({
+                    'label': '目标体重',
+                    'data': target_line,
+                    'borderColor': '#f59e0b',
+                    'borderDash': [5, 5],
+                    'fill': False,
+                    'pointRadius': 0
+                })
+
+            js_parts.append(f"""
+            new Chart(document.getElementById('weightTrendChart'), {{
+                type: 'line',
+                data: {{
+                    labels: {weight_dates},
+                    datasets: {datasets}
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {{
+                        y: {{
+                            beginAtZero: false,
+                            title: {{
+                                display: true,
+                                text: '体重 (kg)'
+                            }}
+                        }}
+                    }}
                 }}
             }});
             """)
