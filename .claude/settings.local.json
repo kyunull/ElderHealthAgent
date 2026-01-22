@@ -32,5 +32,10 @@
       "Bash(./scripts/test-ai-features.sh:*)",
       "Bash(python3:*)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "claude-flow",
+    "ruv-swarm"
+  ],
+  "enableAllProjectMcpServers": true
 }
