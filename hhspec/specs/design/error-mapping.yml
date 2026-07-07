@@ -1,0 +1,169 @@
+# L2 错误处理详设：web-frontend
+# 错误码映射、异常传播、重试降级、日志规范
+
+meta:
+  generated_by: "pd:l2_backend_designer"
+  change_name: "web-frontend"
+  created_at: "2026-07-07T13:35:00Z"
+
+error_classes:
+  - class: AppError
+    base: Error
+    fields: [statusCode, code, userMessage, details]
+    description: 所有应用错误的基类
+
+  - class: ValidationError
+    extends: AppError
+    statusCode: 400
+    code: VALIDATION_ERROR
+    description: 请求参数校验失败
+    examples:
+      - trigger: "drug_name 为空字符串"
+        response: '{ error: { code: "VALIDATION_ERROR", message: "请求参数校验失败", details: { fields: { drug_name: "药品名称不能为空" } } } }'
+      - trigger: "start_date 格式不是 ISO 日期"
+        response: '{ error: { code: "VALIDATION_ERROR", message: "请求参数校验失败", details: { fields: { start_date: "日期格式无效" } } } }'
+
+  - class: AuthError
+    extends: AppError
+    statusCode: 401
+    code: UNAUTHORIZED
+    description: 认证失败（Token无效/过期/未提供）
+    examples:
+      - trigger: "请求头无 Authorization"
+        response: '{ error: { code: "UNAUTHORIZED", message: "请先登录" } }'
+      - trigger: "JWT Token 过期"
+        response: '{ error: { code: "UNAUTHORIZED", message: "登录已过期，请重新登录" } }'
+
+  - class: ForbiddenError
+    extends: AppError
+    statusCode: 403
+    code: FORBIDDEN
+    description: 权限不足（访问其他用户数据）
+    examples:
+      - trigger: "用户 A 请求用户 B 的报告"
+        response: '{ error: { code: "FORBIDDEN", message: "无权访问该资源" } }'
+
+  - class: NotFoundError
+    extends: AppError
+    statusCode: 404
+    code: NOT_FOUND
+    description: 资源不存在
+    examples:
+      - trigger: "report_id 不存在 / 已被删除"
+        response: '{ error: { code: "NOT_FOUND", message: "报告不存在或已被删除" } }'
+
+  - class: ConflictError
+    extends: AppError
+    statusCode: 409
+    code: CONFLICT
+    description: 资源冲突
+    examples:
+      - trigger: "注册已存在的用户名"
+        response: '{ error: { code: "CONFLICT", message: "该用户名已被注册" } }'
+
+  - class: FileTooLargeError
+    extends: AppError
+    statusCode: 413
+    code: FILE_TOO_LARGE
+    description: 上传文件超限
+    examples:
+      - trigger: "图片 > 20MB"
+        response: '{ error: { code: "FILE_TOO_LARGE", message: "图片大小不能超过 20MB，请压缩后重试" } }'
+
+  - class: UnsupportedFormatError
+    extends: AppError
+    statusCode: 415
+    code: UNSUPPORTED_FORMAT
+    description: 文件格式不支持
+    examples:
+      - trigger: "上传 .gif 文件"
+        response: '{ error: { code: "UNSUPPORTED_FORMAT", message: "仅支持 JPG、PNG、PDF 格式" } }'
+
+  - class: AITimeoutError
+    extends: AppError
+    statusCode: 504
+    code: AI_TIMEOUT
+    description: AI API 调用超时
+    retry_strategy:
+      max_retries: 1
+      backoff_ms: 2000
+    examples:
+      - trigger: "Anthropic API 60s 未响应"
+        response: '{ error: { code: "AI_TIMEOUT", message: "AI 分析超时，请稍后重试" } }'
+
+  - class: AIServiceError
+    extends: AppError
+    statusCode: 503
+    code: AI_SERVICE_UNAVAILABLE
+    description: AI API 返回 5xx / 限流
+    examples:
+      - trigger: "Anthropic API 返回 429 Rate Limited"
+        response: '{ error: { code: "AI_SERVICE_UNAVAILABLE", message: "AI 服务繁忙，请稍后重试" } }'
+      - trigger: "Anthropic API 返回 500"
+        response: '{ error: { code: "AI_SERVICE_UNAVAILABLE", message: "AI 服务暂时不可用，请稍后重试" } }'
+
+  - class: ApiKeyNotConfiguredError
+    extends: AppError
+    statusCode: 400
+    code: API_KEY_REQUIRED
+    description: 使用 AI 功能但未配置 API Key
+    examples:
+      - trigger: "尝试上传报告但 api_key_encrypted 为空"
+        response: '{ error: { code: "API_KEY_REQUIRED", message: "请先在设置页面配置 API Key" } }'
+
+  - class: CGAIncompleteError
+    extends: AppError
+    statusCode: 400
+    code: CGA_INCOMPLETE
+    description: CGA 评估维度未全部完成
+    examples:
+      - trigger: "8 个维度中 5 个已完成"
+        response: '{ error: { code: "CGA_INCOMPLETE", message: "还有 3 个维度未完成评估", details: { total: 8, completed: 5, pending_dimensions: ["frailty","nutrition","social"] } } }'
+
+exception_propagation:
+  # AI 调用异常传播链
+  ai_extraction_failure:
+    throw: AITimeoutError | AIServiceError
+    catch_at: "POST /api/reports/upload（异步 handler）"
+    handle: |
+      UPDATE health_reports SET status='failed' WHERE id=?
+      用户 GET /reports/:id 时看到 status='failed' + 重试按钮
+    log: ERROR level, 含 report_id, elapsed_ms, error_message
+
+  # FastAPI 不可用
+  compute_service_unavailable:
+    throw: ConnectionError
+    catch_at: "GET /api/trends/:code"
+    handle: |
+      降级：使用 Node.js 内置 simple-statistics 计算基础趋势
+      响应中附加 warning 字段: "高级分析暂时不可用"
+    log: WARN level
+
+  # SQLite 写入冲突
+  sqlite_busy:
+    throw: SQLITE_BUSY (better-sqlite3)
+    catch_at: Repository 层 executeWithRetry()
+    handle: |
+      WAL 模式下等待 100ms × 3 次
+      仍失败 → throw AppError(503, 'SERVICE_UNAVAILABLE')
+    log: ERROR level on final failure
+
+logging:
+  levels:
+    ERROR:
+      - AI API 调用失败（含 report_id/elapsed_ms）
+      - 数据库写入失败
+      - 未捕获异常
+    WARN:
+      - 请求校验失败（含请求 body 摘要）
+      - FastAPI 降级启用
+      - Token 过期
+      - 文件格式不支持
+    INFO:
+      - 用户登录/注册
+      - 报告上传/删除
+      - AI 分析开始（含 report_id）
+      - 数据迁移进度
+      - 药物相互作用检测完成（含结果计数）
+  format: "[{timestamp}] [{level}] [{module}] {message} {context}"
+  sensitive_fields: [password, password_hash, api_key, api_key_encrypted, token]

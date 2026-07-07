@@ -1,0 +1,346 @@
+# Business Flow: web-frontend
+# WellAlly Health Web 前端界面 - 业务流程图
+# 基于 Phase 2 需求探索的 5 个核心模块
+
+meta:
+  generated_by: "pd:explore Phase 3.2"
+  change_name: "web-frontend"
+  mode: "bootstrap"
+  created_at: "2026-07-07T15:30:00Z"
+
+flows:
+  - id: FLOW-001
+    name: 健康报告上传与识别
+    description: 用户上传检查单图片，AI 识别提取结构化数据，用户确认后存入系统
+    trigger: 用户在健康报告页面点击"上传检查单"
+    steps:
+      - node: select_image
+        type: user_action
+        description: 选择检查单图片文件（支持 jpg/png/pdf）
+      - node: preview_upload
+        type: user_action
+        description: 预览图片，填写报告日期、检查类型
+      - node: upload_to_server
+        type: system_action
+        description: 图片上传到 Express 后端，保存到本地存储
+      - node: call_ai_extraction
+        type: system_action
+        description: Express 调用 Anthropic API 进行 OCR + 结构化提取
+        state_change:
+          entity: HealthReport
+          from: uploaded
+          to: ai_processing
+      - node: receive_structured_data
+        type: system_action
+        description: 接收 AI 返回的结构化指标数据
+      - node: user_review
+        type: decision
+        description: 用户复核 AI 提取结果
+        branches:
+          - condition: confidence >= threshold
+            next: auto_confirm
+          - condition: confidence < threshold
+            next: manual_review
+      - node: auto_confirm
+        type: user_action
+        description: 用户确认数据无误
+        state_change:
+          entity: HealthReport
+          from: ai_processing
+          to: confirmed
+      - node: manual_review
+        type: user_action
+        description: 用户逐项复核并修正
+        state_change:
+          entity: HealthReport
+          from: ai_processing
+          to: review_needed
+      - node: save_indicators
+        type: system_action
+        description: 将确认后的指标保存到 SQLite 数据库
+      - node: view_report
+        type: end_state
+        description: 在报告详情页查看结构化数据
+
+  - id: FLOW-002
+    name: 专科咨询（单专科/MDT）
+    description: 用户选择专科或启动多学科会诊，AI 基于健康数据分析给出建议
+    trigger: 用户在专家分析页面选择咨询类型
+    steps:
+      - node: select_consultation_type
+        type: user_action
+        description: 选择"单专科咨询"或"MDT 多学科会诊"
+      - node: select_specialty
+        type: user_action
+        description: 单专科：选择科室（心内/内分泌/消化等）；MDT：选择多个科室
+      - node: write_complaint
+        type: user_action
+        description: 输入主诉或咨询问题
+      - node: attach_reports
+        type: user_action
+        description: 可选：关联相关健康报告
+      - node: submit_consultation
+        type: system_action
+        description: 提交咨询请求
+        state_change:
+          entity: SpecialistConsultation
+          from: draft
+          to: pending
+      - node: gather_context
+        type: system_action
+        description: 系统收集用户健康数据作为 AI 上下文（报告、指标、用药等）
+      - node: call_ai_analysis
+        type: system_action
+        description: 调用 Anthropic API，传入专科 Skill prompt + 健康数据
+        state_change:
+          entity: SpecialistConsultation
+          from: pending
+          to: processing
+      - node: mdt_parallel
+        type: system_action
+        description: MDT 模式：并行调用多个专科 Skill，然后运行 consultation-coordinator 综合意见
+        condition: consultation_type == mdt
+      - node: receive_ai_response
+        type: system_action
+        description: 接收 AI 分析结果
+      - node: display_result
+        type: end_state
+        description: 展示分析报告（含建议、注意事项、安全声明）
+        state_change:
+          entity: SpecialistConsultation
+          from: processing
+          to: completed
+
+  - id: FLOW-003
+    name: 用药管理与相互作用检测
+    description: 用户管理用药记录，系统自动检测药物相互作用
+    trigger: 用户在用药管理页面操作
+    steps:
+      - node: view_medications
+        type: user_action
+        description: 查看当前用药列表（按状态筛选）
+      - node: add_medication
+        type: user_action
+        description: 添加新用药：药品名、剂量、频率、起止日期
+      - node: save_medication
+        type: system_action
+        description: 保存用药记录到 SQLite
+      - node: trigger_interaction_check
+        type: system_action
+        description: 用药变更后自动触发相互作用检测
+        state_change:
+          entity: DrugInteractionRecord
+          from: idle
+          to: checking
+      - node: search_interaction_db
+        type: system_action
+        description: 将当前所有 active 药物两两匹配，在相互作用数据库中查询
+      - node: evaluate_severity
+        type: system_action
+        description: 按 A/B/C/D/X 五级严重程度分类所有发现的相互作用
+      - node: display_interactions
+        type: end_state
+        description: 展示检测结果：
+          - X/D 级：红色预警，突出显示
+          - C 级：黄色警告
+          - A/B 级：信息提示
+        state_change:
+          entity: DrugInteractionRecord
+          from: checking
+          to: interactions_found
+
+  - id: FLOW-004
+    name: 健康趋势分析
+    description: 用户选择指标查看历史趋势图表
+    trigger: 用户在健康趋势页面选择分析指标
+    steps:
+      - node: select_indicator
+        type: user_action
+        description: 从指标列表中选择要分析的生化指标（如血糖、ALT、肌酐）
+      - node: select_period
+        type: user_action
+        description: 选择时间范围（1月/3月/6月/1年/全部）
+      - node: query_indicator_history
+        type: system_action
+        description: 从 SQLite 查询该指标的所有历史记录
+      - node: call_compute_service
+        type: system_action
+        description: 调用 Python FastAPI 微服务进行统计计算（均值/趋势/异常检测）
+      - node: generate_chart
+        type: system_action
+        description: 前端 ECharts 渲染趋势折线图（含参考范围区间标注）
+      - node: display_summary
+        type: end_state
+        description: 展示趋势摘要：方向（上升/下降/稳定）、异常次数、建议复查项目
+
+  - id: FLOW-005
+    name: 用户认证与档案管理
+    description: 用户登录系统和基础档案维护
+    trigger: 用户访问 Web 界面
+    steps:
+      - node: show_login
+        type: user_action
+        description: 显示登录页面（或注册页面）
+      - node: authenticate
+        type: system_action
+        description: 验证用户名密码
+        state_change:
+          entity: User (session)
+          from: logged_out
+          to: logged_in
+      - node: dashboard
+        type: end_state
+        description: 进入首页仪表盘
+      - node: edit_profile
+        type: user_action
+        description: 编辑个人档案（身高/体重/出生日期/性别/血型）
+      - node: manage_allergies
+        type: user_action
+        description: 管理过敏史（添加/编辑/删除过敏记录）
+      - node: configure_api_key
+        type: user_action
+        description: 配置 Anthropic API Key（用于 AI 分析功能）
+        state_change:
+          entity: User (api_key_encrypted)
+          from: not_configured
+          to: configured
+
+  - id: FLOW-006
+    name: 初始化与数据迁移
+    description: 首次启动 Web 应用时的系统初始化流程
+    trigger: 用户首次运行 npm start / 启动脚本
+    steps:
+      - node: check_db_exists
+        type: system_action
+        description: 检查 SQLite 数据库文件是否存在
+      - node: create_tables
+        type: system_action
+        description: 数据库不存在：创建所有表和索引
+        condition: db_not_exists
+      - node: detect_json_data
+        type: system_action
+        description: 检测 data/ 目录中是否存在 JSON 数据文件
+      - node: run_migration
+        type: system_action
+        description: 运行数据迁移脚本（JSON → SQLite）
+        condition: json_data_exists
+      - node: create_default_admin
+        type: system_action
+        description: 创建默认管理员账户
+        condition: first_run
+      - node: start_web_server
+        type: end_state
+        description: 启动 Express 服务器，监听 localhost:3000
+
+  - id: FLOW-007
+    name: 老年综合评估 (CGA)
+    description: 对老年用户进行多维度综合评估（ADL/IADL/衰弱/营养/认知/抑郁/跌倒/共病/多重用药/社会支持）
+    trigger: 用户进入老年综合评估页面，创建新评估
+    steps:
+      - node: create_assessment
+        type: user_action
+        description: 点击"新建评估"，选择评估日期
+        state_change:
+          entity: CGAAssessment
+          from: draft
+          to: in_progress
+      - node: adl_section
+        type: user_action
+        description: 填写 Barthel 日常生活能力量表（进食/洗澡/修饰/穿衣/大便/小便/如厕/转移/行走/上下楼 10项）
+      - node: iadl_section
+        type: user_action
+        description: 填写 Lawton 工具性日常生活能力量表（购物/烹饪/家务/洗衣/交通/用药/财务/电话 8项）
+      - node: frailty_section
+        type: user_action
+        description: 填写 Fried 衰弱表型（体重下降/疲乏/握力/步速/活动量 5项）
+      - node: nutrition_section
+        type: user_action
+        description: 填写 MNA-SF 简易营养评估（进食变化/体重下降/活动能力/应激/神经心理/ BMI 6项）
+      - node: cognitive_quick_screen
+        type: user_action
+        description: 快速认知筛查（Mini-Cog 或简短 MMSE）
+      - node: depression_section
+        type: user_action
+        description: 填写 GDS-15 老年抑郁量表（15题）
+      - node: fall_risk_section
+        type: user_action
+        description: 填写 Morse 跌倒评估量表（跌倒史/二次诊断/助行器具/静脉输液/步态/精神状态 6项）
+      - node: social_section
+        type: user_action
+        description: 记录社会支持状况和居住安排
+      - node: submit_cga
+        type: system_action
+        description: 所有维度填写完毕，提交 AI 综合分析
+        state_change:
+          entity: CGAAssessment
+          from: in_progress
+          to: ai_analyzing
+      - node: ai_generate_summary
+        type: system_action
+        description: AI 综合分析各维度结果，生成：
+          - 综合评估摘要（主要问题领域 + 优势领域）
+          - 个性化干预建议（营养/运动/认知/社交/用药调整）
+          - 推荐随访频率
+      - node: view_cga_report
+        type: end_state
+        description: 展示 CGA 综合报告（雷达图 + 各维度得分 + AI 建议）
+        state_change:
+          entity: CGAAssessment
+          from: ai_analyzing
+          to: completed
+
+  - id: FLOW-008
+    name: 阿尔茨海默/认知筛查
+    description: 使用标准化量表进行认知功能筛查和纵向跟踪
+    trigger: 用户进入认知筛查页面
+    steps:
+      - node: select_tool
+        type: user_action
+        description: 根据场景选择筛查工具：
+          - AD8：知情者报告，8题快速筛查（适合初筛）
+          - MMSE：30题全面认知评估（最常用）
+          - MoCA：蒙特利尔认知评估（对轻度认知障碍更敏感）
+          - CDR：临床痴呆评定量表（含知情者访谈）
+        state_change:
+          entity: CognitiveScreening
+          from: tool_selection
+          to: questionnaire
+      - node: fill_questionnaire
+        type: user_action
+        description: 逐题作答；
+          - AD8 需知情者/照护者填写（"和几年前相比有无变化"）
+          - MMSE/MoCA 需本人作答（定向力/记忆力/注意力/语言/视空间）
+          - CDR 需同时采集本人和知情者信息
+      - node: auto_score
+        type: system_action
+        description: 自动计算总分和各维度得分；
+          根据受教育程度自动校正（如 MMSE 校正）
+        state_change:
+          entity: CognitiveScreening
+          from: questionnaire
+          to: scored
+      - node: check_previous
+        type: system_action
+        description: 查找该用户的历史筛查记录，计算分数变化趋势
+      - node: ai_interpretation
+        type: system_action
+        description: AI 综合分析：
+          - 评分解读（正常/临界/受损/严重受损）
+          - 与上次筛查的纵向对比
+          - 风险等级评估（低/中/高/极高）
+          - 随访建议（复查时间、转诊建议、生活干预）
+        state_change:
+          entity: CognitiveScreening
+          from: scored
+          to: ai_analyzing
+      - node: view_screening_report
+        type: end_state
+        description: 展示筛查报告：
+          - 总分和各维度得分（柱状图）
+          - 历史筛查趋势对比（折线图）
+          - AI 解读文字和建议
+          - 如有既往筛查，展示分数变化箭头
+        state_change:
+          entity: CognitiveScreening
+          from: ai_analyzing
+          to: completed

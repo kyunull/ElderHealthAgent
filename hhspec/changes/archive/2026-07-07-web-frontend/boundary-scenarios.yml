@@ -1,0 +1,173 @@
+# Boundary Scenarios: web-frontend
+# WellAlly Health Web 前端界面 - 边界场景清单
+# 7类边界覆盖
+
+meta:
+  generated_by: "pd:explore Phase 3.3"
+  change_name: "web-frontend"
+  created_at: "2026-07-07T15:30:00Z"
+
+boundary_scenarios:
+  # ===== 输入边界 =====
+  - id: BND-001
+    category: input_boundary
+    title: 超大图片上传
+    description: 用户上传超过 20MB 的检查单图片
+    expect: 前端校验文件大小，超过限制提示"图片大小不能超过 20MB，请压缩后重试"
+
+  - id: BND-002
+    category: input_boundary
+    title: 不支持的图片格式
+    description: 用户上传非 jpg/png/pdf 格式的文件
+    expect: 前端文件选择器限制可接受类型，后端二次校验返回 400 错误
+
+  - id: BND-003
+    category: input_boundary
+    title: 空用药记录提交
+    description: 用户未填写药品名即提交用药记录
+    expect: 前端表单校验拦截，提示"药品名称不能为空"
+
+  - id: BND-004
+    category: input_boundary
+    title: 无效日期输入
+    description: 用户输入结束日期早于开始日期
+    expect: 前端校验拦截，提示"结束日期不能早于开始日期"
+
+  - id: BND-005
+    category: input_boundary
+    title: 极长文本输入
+    description: 用户在咨询问题中输入超过 5000 字符的文本
+    expect: 前端字数限制 + 后端截断或返回 400
+
+  - id: BND-006
+    category: input_boundary
+    title: SQL 注入防护
+    description: 用户在输入框中尝试 SQL 注入
+    expect: 所有数据库查询使用参数化查询，注入输入被当作普通文本处理
+
+  # ===== 状态边界 =====
+  - id: BND-007
+    category: state_boundary
+    title: 重复提交咨询
+    description: 用户在 AI 处理中时再次点击"提交"按钮
+    expect: 前端按钮置灰 + loading 状态，后端幂等检查返回已有记录
+
+  - id: BND-008
+    category: state_boundary
+    title: 对已删除报告执行操作
+    description: 用户尝试查看或编辑已被删除的健康报告
+    expect: 后端返回 404，前端展示"该报告不存在或已被删除"
+
+  - id: BND-009
+    category: state_boundary
+    title: 停用药物的相互作用检测
+    description: 已停用药物是否参与相互作用检测
+    expect: 仅 active 和 paused 状态的药物参与检测，discontinued/completed 状态不参与
+
+  # ===== 并发边界 =====
+  - id: BND-010
+    category: concurrency_boundary
+    title: 同时上传多个报告
+    description: 用户快速连续上传多张检查单图片
+    expect: 每个上传任务独立处理，不互相干扰；前端显示上传队列进度
+
+  - id: BND-011
+    category: concurrency_boundary
+    title: 多标签页同时操作
+    description: 同一用户在两个浏览器标签页中同时编辑档案
+    expect: 后保存的覆盖先保存的（last-write-wins），不产生数据损坏
+
+  # ===== 资源边界 =====
+  - id: BND-012
+    category: resource_boundary
+    title: API Key 未配置时使用 AI 功能
+    description: 用户尚未配置 Anthropic API Key 即尝试上传报告或发起咨询
+    expect: 前端检测 API Key 状态，未配置时引导用户先到设置页面配置；AI 功能入口显示"请先配置 API Key"
+
+  - id: BND-013
+    category: resource_boundary
+    title: 磁盘空间不足
+    description: 上传图片时本地磁盘空间不足
+    expect: 后端捕获写入错误，返回友好提示"存储空间不足，请清理后重试"
+
+  - id: BND-014
+    category: resource_boundary
+    title: SQLite 数据库文件锁定
+    description: 高频率写入时 SQLite 文件被锁定
+    expect: 使用 WAL 模式，写入队列化，超时后返回"系统繁忙，请稍后重试"
+
+  # ===== 时序边界 =====
+  - id: BND-015
+    category: timing_boundary
+    title: AI API 调用超时
+    description: Anthropic API 响应超过 60 秒
+    expect: 后端设置 60s 超时，超时后前端展示"AI 分析超时，请稍后重试"，允许用户重新触发
+
+  - id: BND-016
+    category: timing_boundary
+    title: 会话过期
+    description: 用户登录后长时间未操作，JWT Token 过期
+    expect: 后端返回 401，前端自动跳转登录页，展示"登录已过期，请重新登录"
+
+  - id: BND-017
+    category: timing_boundary
+    title: 数据迁移耗时
+    description: 首次启动时 JSON 数据量较大，迁移耗时超过预期
+    expect: 启动时显示迁移进度条，迁移完成前不启动 Web 服务；迁移失败时显示错误详情并允许跳过
+
+  # ===== 数据边界 =====
+  - id: BND-018
+    category: data_boundary
+    title: 无历史数据时的趋势分析
+    description: 新用户没有任何历史指标记录，尝试查看趋势
+    expect: 展示空状态提示"暂无历史数据，上传第一份检查单后将自动生成趋势"
+
+  - id: BND-019
+    category: data_boundary
+    title: 药物相互作用数据库为空
+    description: 相互作用规则数据库文件缺失或为空
+    expect: 检测完成后提示"相互作用数据库未加载，请联系管理员"，不阻止用药管理功能
+
+  - id: BND-020
+    category: data_boundary
+    title: 指标参考范围缺失
+    description: AI 提取的指标没有参考范围
+    expect: 趋势图中不标注参考范围区间，仅展示数值变化曲线；报告中标注"参考范围未获取"
+
+  # ===== 权限边界 =====
+  - id: BND-021
+    category: permission_boundary
+    title: 跨用户数据访问
+    description: 用户 A 尝试通过修改 URL 参数访问用户 B 的数据
+    expect: 后端所有数据查询均校验 user_id，返回 403 Forbidden
+
+  - id: BND-022
+    category: permission_boundary
+    title: 未登录访问 API
+    description: 未登录用户直接访问 API 端点
+    expect: 除 POST /api/auth/login 和 POST /api/auth/register 外，所有 API 返回 401 Unauthorized
+
+  - id: BND-023
+    category: permission_boundary
+    title: API Key 明文泄露
+    description: API Key 是否会在前端日志或网络请求中暴露
+    expect: API Key 仅存储在加密的 SQLite 字段中；后端代理所有 AI API 调用（不从前端直接调用）；前端看不到原始 Key
+
+  # ===== 老年健康专项边界 =====
+  - id: BND-024
+    category: input_boundary
+    title: CGA 部分维度未填写就提交
+    description: 用户未填写所有 CGA 维度即点击提交 AI 分析
+    expect: 前端校验所有必填维度完整性，未完成项标红提示，阻止提交
+
+  - id: BND-025
+    category: input_boundary
+    title: 认知筛查工具与填写人不匹配
+    description: 用户选择 AD8（需知情者）但没有知情者参与
+    expect: 前端提示"AD8 需要知情者/照护者填写，如无知情者请选择 MMSE 或 MoCA"
+
+  - id: BND-026
+    category: data_boundary
+    title: 认知筛查分数异常跳跃
+    description: 两次相邻筛查分数变化超过合理范围（如 MMSE 6个月内下降 > 5 分）
+    expect: AI 分析中标注"分数变化超出预期范围，建议排除干扰因素（如急性疾病、药物影响），并缩短复查间隔至 1-3 个月"

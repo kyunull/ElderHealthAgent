@@ -1,0 +1,808 @@
+# API Contracts: web-frontend
+# OpenAPI 3.0 接口契约
+# L1.2 架构设计产出
+
+openapi: "3.0.3"
+info:
+  title: "WellAlly Health Web API"
+  version: "1.0.0"
+  description: "个人医疗健康数据管理 Web 界面后端 API"
+
+servers:
+  - url: "http://localhost:3000/api"
+    description: "本地开发服务器"
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ==================== Auth ====================
+  /auth/register:
+    post:
+      operationId: register
+      summary: 注册新账户
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, display_name, password]
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 50
+                display_name:
+                  type: string
+                  maxLength: 100
+                password:
+                  type: string
+                  minLength: 6
+      responses:
+        201:
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        409:
+          $ref: "#/components/responses/Conflict"
+
+  /auth/login:
+    post:
+      operationId: login
+      summary: 用户登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        200:
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      summary: 获取当前用户信息
+      security: [{ bearerAuth: [] }]
+      responses:
+        200:
+          description: 当前用户信息
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  # ==================== Reports ====================
+  /reports/upload:
+    post:
+      operationId: uploadReport
+      summary: 上传检查单图片并触发 AI 识别
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image, report_date, report_type]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: 检查单图片 (jpg/png/pdf, ≤20MB)
+                report_date:
+                  type: string
+                  format: date
+                report_type:
+                  type: string
+                  enum: [biochemical, imaging]
+                hospital_name:
+                  type: string
+                  maxLength: 300
+                department:
+                  type: string
+                  maxLength: 200
+      responses:
+        201:
+          description: 上传成功，AI 识别中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReport"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        413:
+          description: 文件过大
+
+  /reports:
+    get:
+      operationId: listReports
+      summary: 查询健康报告列表
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: report_type
+          in: query
+          schema: { type: string, enum: [biochemical, imaging] }
+        - name: start_date
+          in: query
+          schema: { type: string, format: date }
+        - name: end_date
+          in: query
+          schema: { type: string, format: date }
+        - name: status
+          in: query
+          schema: { type: string, enum: [uploaded, ai_processing, processed, review_needed, confirmed, failed] }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+      responses:
+        200:
+          description: 报告列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/HealthReport"
+                  total: { type: integer }
+                  page: { type: integer }
+                  limit: { type: integer }
+
+  /reports/{id}:
+    get:
+      operationId: getReport
+      summary: 获取报告详情（含指标/发现）
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: 报告详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReportDetail"
+        404:
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: updateReport
+      summary: 更新报告（人工复核修正）
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                indicators:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/IndicatorUpdate"
+      responses:
+        200:
+          description: 更新成功
+    delete:
+      operationId: deleteReport
+      summary: 删除报告
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        204:
+          description: 删除成功
+
+  # ==================== Medications ====================
+  /medications:
+    get:
+      operationId: listMedications
+      summary: 查询用药列表
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, discontinued, completed, paused] }
+      responses:
+        200:
+          description: 用药列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Medication"
+    post:
+      operationId: addMedication
+      summary: 添加用药记录
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [drug_name, dosage, frequency, start_date]
+              properties:
+                drug_name: { type: string, maxLength: 300 }
+                generic_name: { type: string, maxLength: 300 }
+                dosage: { type: string, maxLength: 100 }
+                dosage_unit: { type: string, maxLength: 50 }
+                frequency: { type: string, maxLength: 100 }
+                route: { type: string, enum: [oral, topical, injection, inhalation, sublingual, rectal, other] }
+                start_date: { type: string, format: date }
+                end_date: { type: string, format: date }
+                notes: { type: string }
+      responses:
+        201:
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Medication"
+
+  /medications/{id}:
+    put:
+      operationId: updateMedication
+      summary: 更新用药记录
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: 更新成功
+
+  /medications/interactions/check:
+    post:
+      operationId: checkInteractions
+      summary: 检测当前用药的相互作用
+      security: [{ bearerAuth: [] }]
+      responses:
+        200:
+          description: 检测结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  interactions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/InteractionResult"
+                  total_count: { type: integer }
+                  x_count: { type: integer, description: "禁忌级数量" }
+                  d_count: { type: integer, description: "考虑调整级数量" }
+
+  # ==================== Consultations ====================
+  /consultations/specialist:
+    post:
+      operationId: createSpecialistConsult
+      summary: 创建单专科咨询
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [specialty, chief_complaint]
+              properties:
+                specialty: { type: string, maxLength: 200 }
+                chief_complaint: { type: string, maxLength: 5000 }
+                related_report_ids: { type: array, items: { type: integer } }
+      responses:
+        201:
+          description: 咨询已提交
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Consultation"
+
+  /consultations/mdt:
+    post:
+      operationId: createMDTConsult
+      summary: 创建 MDT 多学科会诊
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [specialties, chief_complaint]
+              properties:
+                specialties:
+                  type: array
+                  items: { type: string }
+                  minItems: 2
+                chief_complaint: { type: string, maxLength: 5000 }
+                related_report_ids: { type: array, items: { type: integer } }
+      responses:
+        201:
+          description: 会诊已提交
+
+  /consultations:
+    get:
+      operationId: listConsultations
+      summary: 查询咨询历史
+      security: [{ bearerAuth: [] }]
+      responses:
+        200:
+          description: 咨询列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Consultation"
+
+  # ==================== Trends ====================
+  /trends/{indicatorCode}:
+    get:
+      operationId: getTrend
+      summary: 获取指标趋势数据
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: indicatorCode
+          in: path
+          required: true
+          schema: { type: string }
+          description: 标准化指标代码（如 GLU, ALT, CREA）
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [1m, 3m, 6m, 1y, all]
+            default: 6m
+      responses:
+        200:
+          description: 趋势数据
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrendResult"
+
+  # ==================== CGA ====================
+  /cga-assessments:
+    get:
+      operationId: listCGAAssessments
+      summary: 查询 CGA 评估列表
+      security: [{ bearerAuth: [] }]
+      responses:
+        200:
+          description: CGA 评估列表
+    post:
+      operationId: createCGAAssessment
+      summary: 创建新的 CGA 评估
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assessment_date]
+              properties:
+                assessment_date: { type: string, format: date }
+      responses:
+        201:
+          description: 创建成功
+
+  /cga-assessments/{id}:
+    get:
+      operationId: getCGAAssessment
+      summary: 获取 CGA 评估详情
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: CGA 详情
+    put:
+      operationId: updateCGADimension
+      summary: 更新 CGA 某个维度的评分
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dimension:
+                  type: string
+                  enum: [adl, iadl, frailty, nutrition, cognitive_quick, depression, fall_risk, social]
+                data:
+                  type: object
+
+  /cga-assessments/{id}/analyze:
+    post:
+      operationId: analyzeCGA
+      summary: 提交 AI 综合分析
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: AI 分析完成
+
+  # ==================== Cognitive Screening ====================
+  /cognitive-screenings:
+    get:
+      operationId: listScreenings
+      summary: 查询认知筛查列表
+      security: [{ bearerAuth: [] }]
+      responses:
+        200:
+          description: 筛查列表
+    post:
+      operationId: createScreening
+      summary: 创建新的认知筛查
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [screening_date, screening_type]
+              properties:
+                screening_date: { type: string, format: date }
+                screening_type: { type: string, enum: [AD8, MMSE, MoCA, CDR, Mini_Cog, GPCOG] }
+                education_years: { type: integer }
+                informant_available: { type: boolean }
+                cga_assessment_id: { type: integer }
+
+  /cognitive-screenings/{id}:
+    get:
+      operationId: getScreening
+      summary: 获取筛查详情
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+    put:
+      operationId: submitAnswers
+      summary: 提交量表答案
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [answers]
+              properties:
+                answers: { type: object }
+                informant_responses: { type: object }
+
+  /cognitive-screenings/{id}/analyze:
+    post:
+      operationId: analyzeScreening
+      summary: 请求 AI 综合解读
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+
+  /cognitive-screenings/trend:
+    get:
+      operationId: getScreeningTrend
+      summary: 获取认知筛查纵向趋势
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: screening_type
+          in: query
+          schema: { type: string }
+      responses:
+        200:
+          description: 趋势数据
+
+  # ==================== Profile ====================
+  /profile:
+    get:
+      operationId: getProfile
+      summary: 获取个人档案
+      security: [{ bearerAuth: [] }]
+      responses:
+        200:
+          description: 个人档案
+    put:
+      operationId: updateProfile
+      summary: 更新个人档案
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name: { type: string }
+                height_cm: { type: number }
+                weight_kg: { type: number }
+                birth_date: { type: string, format: date }
+                gender: { type: string, enum: [male, female, other] }
+                blood_type: { type: string, enum: [A, B, AB, O] }
+
+  /profile/allergies:
+    get:
+      operationId: listAllergies
+      summary: 查询过敏史
+      security: [{ bearerAuth: [] }]
+    post:
+      operationId: addAllergy
+      summary: 添加过敏记录
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [allergen, severity]
+              properties:
+                allergen: { type: string, maxLength: 200 }
+                severity: { type: string, enum: [mild, moderate, severe, life_threatening] }
+                reaction: { type: string }
+
+  /profile/allergies/{id}:
+    put:
+      operationId: updateAllergy
+      security: [{ bearerAuth: [] }]
+    delete:
+      operationId: deleteAllergy
+      security: [{ bearerAuth: [] }]
+
+  # ==================== Settings ====================
+  /settings/api-key:
+    put:
+      operationId: saveApiKey
+      summary: 保存 Anthropic API Key
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [api_key]
+              properties:
+                api_key: { type: string }
+
+  /settings/api-key/verify:
+    post:
+      operationId: verifyApiKey
+      summary: 验证 API Key 有效性
+      security: [{ bearerAuth: [] }]
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    AuthResponse:
+      type: object
+      properties:
+        token: { type: string }
+        user:
+          $ref: "#/components/schemas/UserProfile"
+
+    UserProfile:
+      type: object
+      properties:
+        id: { type: integer }
+        username: { type: string }
+        display_name: { type: string }
+        role: { type: string }
+        height_cm: { type: number, nullable: true }
+        weight_kg: { type: number, nullable: true }
+        birth_date: { type: string, format: date, nullable: true }
+        gender: { type: string, nullable: true }
+        blood_type: { type: string, nullable: true }
+        api_key_configured: { type: boolean }
+
+    HealthReport:
+      type: object
+      properties:
+        id: { type: integer }
+        user_id: { type: integer }
+        report_type: { type: string }
+        title: { type: string }
+        report_date: { type: string, format: date }
+        hospital_name: { type: string, nullable: true }
+        department: { type: string, nullable: true }
+        ai_processed: { type: boolean }
+        status: { type: string }
+        created_at: { type: string, format: date-time }
+
+    HealthReportDetail:
+      allOf:
+        - $ref: "#/components/schemas/HealthReport"
+        - type: object
+          properties:
+            indicators:
+              type: array
+              items:
+                $ref: "#/components/schemas/BiochemicalIndicator"
+              description: 仅生化报告
+            findings:
+              type: array
+              items:
+                $ref: "#/components/schemas/ImagingFinding"
+              description: 仅影像报告
+
+    BiochemicalIndicator:
+      type: object
+      properties:
+        id: { type: integer }
+        indicator_name: { type: string }
+        indicator_code: { type: string }
+        value: { type: number }
+        unit: { type: string }
+        reference_range_low: { type: number, nullable: true }
+        reference_range_high: { type: number, nullable: true }
+        reference_range_text: { type: string, nullable: true }
+        is_abnormal: { type: boolean }
+        abnormality_direction: { type: string, nullable: true }
+
+    ImagingFinding:
+      type: object
+      properties:
+        id: { type: integer }
+        body_part: { type: string }
+        modality: { type: string }
+        finding: { type: string }
+        impression: { type: string, nullable: true }
+
+    IndicatorUpdate:
+      type: object
+      properties:
+        id: { type: integer }
+        value: { type: number }
+        indicator_name: { type: string }
+
+    Medication:
+      type: object
+      properties:
+        id: { type: integer }
+        drug_name: { type: string }
+        generic_name: { type: string, nullable: true }
+        dosage: { type: string }
+        dosage_unit: { type: string }
+        frequency: { type: string }
+        route: { type: string }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date, nullable: true }
+        status: { type: string }
+        notes: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    InteractionResult:
+      type: object
+      properties:
+        drug_pair: { type: string }
+        severity: { type: string, enum: [A, B, C, D, X] }
+        mechanism: { type: string }
+        management: { type: string }
+        medication_ids: { type: array, items: { type: integer } }
+
+    Consultation:
+      type: object
+      properties:
+        id: { type: integer }
+        consultation_type: { type: string }
+        specialty: { type: string, nullable: true }
+        chief_complaint: { type: string }
+        ai_response: { type: string, nullable: true }
+        mdt_specialties: { type: array, items: { type: string }, nullable: true }
+        mdt_summary: { type: string, nullable: true }
+        status: { type: string }
+        created_at: { type: string, format: date-time }
+
+    TrendResult:
+      type: object
+      properties:
+        indicator_code: { type: string }
+        period: { type: string }
+        data_points:
+          type: array
+          items:
+            type: object
+            properties:
+              date: { type: string, format: date }
+              value: { type: number }
+        trend_direction: { type: string }
+        min_value: { type: number }
+        max_value: { type: number }
+        avg_value: { type: number }
+        reference_range: { type: object, nullable: true }
+
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: 未认证
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: 资源冲突
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: { type: object }

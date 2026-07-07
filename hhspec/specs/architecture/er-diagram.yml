@@ -1,0 +1,625 @@
+# ER Diagram: web-frontend
+# WellAlly Health Web 前端界面 - 实体关系图
+# 基于 Phase 2 需求探索的 5 个核心模块
+
+meta:
+  generated_by: "pd:explore Phase 3.1"
+  change_name: "web-frontend"
+  mode: "bootstrap"
+  created_at: "2026-07-07T15:30:00Z"
+
+entities:
+  - id: User
+    name: 用户
+    description: 系统用户基础档案
+    fields:
+      - name: id
+        type: integer
+        primary: true
+        auto_increment: true
+      - name: username
+        type: string
+        required: true
+        unique: true
+        max_length: 50
+      - name: password_hash
+        type: string
+        required: true
+      - name: display_name
+        type: string
+        required: true
+        max_length: 100
+      - name: role
+        type: enum
+        values: [patient, doctor, admin]
+        default: patient
+      - name: height_cm
+        type: float
+        nullable: true
+      - name: weight_kg
+        type: float
+        nullable: true
+      - name: birth_date
+        type: date
+        nullable: true
+      - name: gender
+        type: enum
+        values: [male, female, other]
+        nullable: true
+      - name: blood_type
+        type: enum
+        values: [A, B, AB, O]
+        nullable: true
+      - name: api_key_encrypted
+        type: string
+        nullable: true
+        description: 用户配置的 Anthropic API Key（本地加密存储）
+      - name: created_at
+        type: datetime
+        default: CURRENT_TIMESTAMP
+      - name: updated_at
+        type: datetime
+        default: CURRENT_TIMESTAMP
+    relations:
+      - target: Allergy
+        type: has_many
+      - target: HealthReport
+        type: has_many
+      - target: Medication
+        type: has_many
+      - target: SpecialistConsultation
+        type: has_many
+      - target: HealthTrend
+        type: has_many
+
+  - id: Allergy
+    name: 过敏史
+    description: 用户过敏记录
+    fields:
+      - name: id
+        type: integer
+        primary: true
+        auto_increment: true
+      - name: user_id
+        type: integer
+        required: true
+        foreign_key: User.id
+      - name: allergen
+        type: string
+        required: true
+        max_length: 200
+      - name: severity
+        type: enum
+        values: [mild, moderate, severe, life_threatening]
+        default: mild
+      - name: reaction
+        type: text
+        nullable: true
+      - name: recorded_at
+        type: datetime
+        default: CURRENT_TIMESTAMP
+
+  - id: HealthReport
+    name: 健康报告
+    description: 生化检查或影像检查报告
+    fields:
+      - name: id
+        type: integer
+        primary: true
+        auto_increment: true
+      - name: user_id
+        type: integer
+        required: true
+        foreign_key: User.id
+      - name: report_type
+        type: enum
+        values: [biochemical, imaging]
+        required: true
+      - name: title
+        type: string
+        required: true
+        max_length: 500
+      - name: report_date
+        type: date
+        required: true
+      - name: hospital_name
+        type: string
+        nullable: true
+        max_length: 300
+      - name: department
+        type: string
+        nullable: true
+        max_length: 200
+      - name: original_image_path
+        type: string
+        nullable: true
+        description: 原始检查单图片路径
+      - name: raw_text
+        type: text
+        nullable: true
+        description: AI 识别提取的原始文本
+      - name: ai_processed
+        type: boolean
+        default: false
+      - name: created_at
+        type: datetime
+        default: CURRENT_TIMESTAMP
+    relations:
+      - target: BiochemicalIndicator
+        type: has_many
+        condition: report_type = biochemical
+      - target: ImagingFinding
+        type: has_many
+        condition: report_type = imaging
+
+  - id: BiochemicalIndicator
+    name: 生化指标
+    description: 生化检查中的具体指标项
+    fields:
+      - name: id
+        type: integer
+        primary: true
+        auto_increment: true
+      - name: report_id
+        type: integer
+        required: true
+        foreign_key: HealthReport.id
+      - name: indicator_name
+        type: string
+        required: true
+        max_length: 200
+      - name: indicator_code
+        type: string
+        nullable: true
+        max_length: 50
+        description: 标准化指标代码（如 GLU, ALT, CREA）
+      - name: value
+        type: float
+        required: true
+      - name: unit
+        type: string
+        nullable: true
+        max_length: 50
+      - name: reference_range_low
+        type: float
+        nullable: true
+      - name: reference_range_high
+        type: float
+        nullable: true
+      - name: reference_range_text
+        type: string
+        nullable: true
+      - name: is_abnormal
+        type: boolean
+        default: false
+      - name: abnormality_direction
+        type: enum
+        values: [high, low, abnormal]
+        nullable: true
+
+  - id: ImagingFinding
+    name: 影像发现
+    description: 影像检查的结构化发现
+    fields:
+      - name: id
+        type: integer
+        primary: true
+        auto_increment: true
+      - name: report_id
+        type: integer
+        required: true
+        foreign_key: HealthReport.id
+      - name: body_part
+        type: string
+        required: true
+        max_length: 200
+      - name: modality
+        type: enum
+        values: [CT, MRI, X-ray, Ultrasound, PET-CT, other]
+        required: true
+      - name: finding
+        type: text
+        required: true
+      - name: impression
+        type: text
+        nullable: true
+
+  - id: Medication
+    name: 用药记录
+    description: 用户用药计划或历史记录
+    fields:
+      - name: id
+        type: integer
+        primary: true
+        auto_increment: true
+      - name: user_id
+        type: integer
+        required: true
+        foreign_key: User.id
+      - name: drug_name
+        type: string
+        required: true
+        max_length: 300
+      - name: generic_name
+        type: string
+        nullable: true
+        max_length: 300
+      - name: dosage
+        type: string
+        required: true
+        max_length: 100
+      - name: dosage_unit
+        type: string
+        nullable: true
+        max_length: 50
+      - name: frequency
+        type: string
+        required: true
+        max_length: 100
+        description: 用药频率（如 qd, bid, tid）
+      - name: route
+        type: enum
+        values: [oral, topical, injection, inhalation, sublingual, rectal, other]
+        default: oral
+      - name: start_date
+        type: date
+        required: true
+      - name: end_date
+        type: date
+        nullable: true
+      - name: status
+        type: enum
+        values: [active, discontinued, completed, paused]
+        default: active
+      - name: notes
+        type: text
+        nullable: true
+      - name: created_at
+        type: datetime
+        default: CURRENT_TIMESTAMP
+
+  - id: DrugInteractionRecord
+    name: 药物相互作用记录
+    description: 用户用药方案的相互作用检测结果
+    fields:
+      - name: id
+        type: integer
+        primary: true
+        auto_increment: true
+      - name: user_id
+        type: integer
+        required: true
+        foreign_key: User.id
+      - name: drug_pair
+        type: string
+        required: true
+        max_length: 600
+        description: 相互作用的药物对（如 "阿司匹林+华法林"）
+      - name: severity
+        type: enum
+        values: [A, B, C, D, X]
+        required: true
+        description: A=无已知相互作用, B=轻微, C=需监测, D=考虑调整, X=禁忌
+      - name: mechanism
+        type: text
+        nullable: true
+      - name: management
+        type: text
+        nullable: true
+      - name: medication_ids
+        type: string
+        nullable: true
+        description: 关联的 Medication.id 列表（JSON array）
+      - name: checked_at
+        type: datetime
+        default: CURRENT_TIMESTAMP
+
+  - id: SpecialistConsultation
+    name: 专科咨询
+    description: 单专科或 MDT 多学科会诊记录
+    fields:
+      - name: id
+        type: integer
+        primary: true
+        auto_increment: true
+      - name: user_id
+        type: integer
+        required: true
+        foreign_key: User.id
+      - name: consultation_type
+        type: enum
+        values: [single_specialist, mdt]
+        required: true
+      - name: specialty
+        type: string
+        nullable: true
+        max_length: 200
+        description: 专科名称（单专科时必填），如 cardiology, endocrinology
+      - name: chief_complaint
+        type: text
+        required: true
+        description: 主诉或咨询问题
+      - name: related_report_ids
+        type: string
+        nullable: true
+        description: 关联报告 ID 列表（JSON array）
+      - name: ai_response
+        type: text
+        nullable: true
+        description: AI 分析回复
+      - name: mdt_specialties
+        type: string
+        nullable: true
+        description: MDT 会诊参与的专科列表（JSON array）
+      - name: mdt_summary
+        type: text
+        nullable: true
+        description: MDT 会诊综合意见
+      - name: status
+        type: enum
+        values: [pending, processing, completed, failed]
+        default: pending
+      - name: created_at
+        type: datetime
+        default: CURRENT_TIMESTAMP
+
+  - id: HealthTrend
+    name: 健康趋势
+    description: 健康指标的趋势分析缓存
+    fields:
+      - name: id
+        type: integer
+        primary: true
+        auto_increment: true
+      - name: user_id
+        type: integer
+        required: true
+        foreign_key: User.id
+      - name: indicator_code
+        type: string
+        required: true
+        max_length: 50
+      - name: period
+        type: enum
+        values: [1m, 3m, 6m, 1y, all]
+        required: true
+      - name: data_points
+        type: text
+        required: true
+        description: 趋势数据点（JSON array of {date, value}）
+      - name: trend_direction
+        type: enum
+        values: [increasing, decreasing, stable, fluctuating]
+        nullable: true
+      - name: min_value
+        type: float
+        nullable: true
+      - name: max_value
+        type: float
+        nullable: true
+      - name: avg_value
+        type: float
+        nullable: true
+      - name: generated_at
+        type: datetime
+        default: CURRENT_TIMESTAMP
+
+  - id: CGAAssessment
+    name: 老年综合评估
+    description: Comprehensive Geriatric Assessment - 多维度老年健康评估
+    fields:
+      - name: id
+        type: integer
+        primary: true
+        auto_increment: true
+      - name: user_id
+        type: integer
+        required: true
+        foreign_key: User.id
+      - name: assessment_date
+        type: date
+        required: true
+      - name: adl_score
+        type: integer
+        nullable: true
+        description: 日常生活能力评分（Barthel 指数，0-100，分数越高独立性越好）
+      - name: adl_level
+        type: enum
+        values: [independent, mild_dependent, moderate_dependent, severe_dependent, total_dependent]
+        nullable: true
+      - name: iadl_score
+        type: integer
+        nullable: true
+        description: 工具性日常生活能力评分（Lawton IADL，0-8，分数越高能力越好）
+      - name: iadl_items
+        type: string
+        nullable: true
+        description: IADL 各项得分明细（JSON: {shopping, cooking, cleaning, laundry, transport, medication, finance, phone}）
+      - name: frailty_score
+        type: integer
+        nullable: true
+        description: Fried 衰弱表型评分（0-5，≥3=衰弱，1-2=衰弱前期，0=健壮）
+      - name: frailty_items
+        type: string
+        nullable: true
+        description: 衰弱五项明细（JSON: {weight_loss, exhaustion, grip_strength, gait_speed, activity}）
+      - name: nutrition_score
+        type: integer
+        nullable: true
+        description: MNA-SF 简易营养评估评分（0-14，≤7=营养不良，8-11=风险，12-14=正常）
+      - name: cognitive_score
+        type: integer
+        nullable: true
+        description: CGA 中的认知快速筛查评分（Mini-Cog 或 MMSE 简要版）
+      - name: depression_score
+        type: integer
+        nullable: true
+        description: GDS-15 老年抑郁量表评分（0-15，≥5=疑似抑郁）
+      - name: fall_risk_score
+        type: integer
+        nullable: true
+        description: Morse 跌倒评估评分（0-125，>45=高风险）
+      - name: comorbidity_count
+        type: integer
+        nullable: true
+        description: Charlson 共病指数
+      - name: polypharmacy_flag
+        type: boolean
+        default: false
+        description: 多重用药标志（≥5种药物）
+      - name: social_support
+        type: enum
+        values: [good, fair, poor, none]
+        nullable: true
+      - name: living_arrangement
+        type: enum
+        values: [alone, spouse, family, assisted_living, nursing_home]
+        nullable: true
+      - name: overall_summary
+        type: text
+        nullable: true
+        description: AI 生成的综合评估摘要
+      - name: recommendations
+        type: text
+        nullable: true
+        description: AI 生成的干预建议
+      - name: status
+        type: enum
+        values: [draft, in_progress, completed, reviewed]
+        default: draft
+      - name: created_at
+        type: datetime
+        default: CURRENT_TIMESTAMP
+    relations:
+      - target: User
+        type: belongs_to
+      - target: CognitiveScreening
+        type: has_many
+        description: CGA 可包含多次认知筛查跟踪
+
+  - id: CognitiveScreening
+    name: 认知筛查
+    description: 阿尔茨海默病及相关痴呆的认知筛查评估
+    fields:
+      - name: id
+        type: integer
+        primary: true
+        auto_increment: true
+      - name: user_id
+        type: integer
+        required: true
+        foreign_key: User.id
+      - name: cga_assessment_id
+        type: integer
+        nullable: true
+        foreign_key: CGAAssessment.id
+        description: 如果是在 CGA 中发起的筛查，关联 CGA 记录
+      - name: screening_date
+        type: date
+        required: true
+      - name: screening_type
+        type: enum
+        values: [AD8, MMSE, MoCA, CDR, Mini_Cog, GPCOG]
+        required: true
+        description: 筛查工具类型
+      - name: total_score
+        type: float
+        nullable: true
+        description: 量表总分
+      - name: score_max
+        type: float
+        nullable: true
+        description: 量表满分
+      - name: score_interpretation
+        type: enum
+        values: [normal, borderline, impaired, severely_impaired]
+        nullable: true
+      - name: subsection_scores
+        type: string
+        nullable: true
+        description: 各维度得分明细（JSON，按量表不同结构不同）
+      - name: education_adjusted
+        type: boolean
+        default: false
+        description: 是否已按受教育程度校正
+      - name: education_years
+        type: integer
+        nullable: true
+      - name: informant_available
+        type: boolean
+        default: false
+        description: 是否有知情者/照护者提供信息（AD8 必需）
+      - name: informant_responses
+        type: string
+        nullable: true
+        description: 知情者回答明细（JSON）
+      - name: cdr_global_score
+        type: float
+        nullable: true
+        description: CDR 总体评分（0=正常, 0.5=可疑, 1=轻度, 2=中度, 3=重度）
+      - name: cdr_domains
+        type: string
+        nullable: true
+        description: CDR 六域评分明细（JSON: {memory, orientation, judgment, community, home, personal_care}）
+      - name: symptoms_duration_months
+        type: integer
+        nullable: true
+      - name: daily_function_impact
+        type: enum
+        values: [none, mild, moderate, severe]
+        nullable: true
+      - name: ai_analysis
+        type: text
+        nullable: true
+        description: AI 对筛查结果的综合分析
+      - name: risk_level
+        type: enum
+        values: [low, moderate, high, very_high]
+        nullable: true
+      - name: follow_up_recommendation
+        type: text
+        nullable: true
+        description: AI 生成的随访建议（如"建议转诊神经内科"）
+      - name: status
+        type: enum
+        values: [draft, in_progress, completed, reviewed]
+        default: draft
+      - name: previous_screening_id
+        type: integer
+        nullable: true
+        foreign_key: CognitiveScreening.id
+        description: 关联上次筛查，用于纵向对比
+      - name: score_change
+        type: float
+        nullable: true
+        description: 与上次筛查的分数变化
+      - name: created_at
+        type: datetime
+        default: CURRENT_TIMESTAMP
+    relations:
+      - target: User
+        type: belongs_to
+      - target: CGAAssessment
+        type: belongs_to
+
+  - id: SystemConfig
+    name: 系统配置
+    description: 应用级配置键值对
+    fields:
+      - name: id
+        type: integer
+        primary: true
+        auto_increment: true
+      - name: config_key
+        type: string
+        required: true
+        unique: true
+      - name: config_value
+        type: text
+        required: true
+      - name: description
+        type: string
+        nullable: true
+      - name: updated_at
+        type: datetime
+        default: CURRENT_TIMESTAMP

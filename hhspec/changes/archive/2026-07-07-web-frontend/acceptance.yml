@@ -1,0 +1,511 @@
+# Acceptance Criteria: web-frontend
+# WellAlly Health Web 前端界面 - 验收场景
+# Given/When/Then 格式
+
+meta:
+  generated_by: "pd:explore Phase 3.4"
+  change_name: "web-frontend"
+  created_at: "2026-07-07T15:30:00Z"
+
+scenarios:
+  # ===== FUNC 功能验收 =====
+  - id: FUNC-001
+    title: 用户注册与登录
+    page: LoginPage
+    source: FLOW-005
+    ctx:
+      - 系统已初始化
+      - 没有活跃会话
+    act:
+      - 用户访问 Web 界面
+      - 输入用户名和密码
+      - 点击登录
+    expect:
+      - 验证通过后跳转到 Dashboard 首页
+      - 导航栏显示用户名
+      - JWT Token 存储在 sessionStorage
+
+  - id: FUNC-002
+    title: 首次注册新账户
+    page: RegisterPage
+    source: FLOW-005
+    ctx:
+      - 系统已初始化
+      - 数据库中无此用户名
+    act:
+      - 用户点击"注册新账户"
+      - 输入用户名、显示名、密码、确认密码
+      - 点击注册
+    expect:
+      - 注册成功后自动登录跳转到 Dashboard
+      - Dashboard 显示欢迎引导（API Key 配置引导）
+
+  - id: FUNC-003
+    title: 上传检查单并 AI 识别
+    page: ReportUpload
+    source: FLOW-001
+    ctx:
+      - 用户已登录
+      - 已配置 API Key
+    act:
+      - 用户点击"上传检查单"
+      - 选择一张生化检查单图片
+      - 选择报告日期和检查类型
+      - 点击"开始识别"
+    expect:
+      - 图片上传成功
+      - 显示"AI 识别中"进度动画
+      - 识别完成后展示结构化指标表格
+      - 每条指标含：指标名、数值、单位、参考范围、异常标记
+
+  - id: FUNC-004
+    title: 人工复核 AI 识别结果
+    page: ReportReview
+    source: FLOW-001
+    ctx:
+      - AI 识别已完成
+      - 置信度低于阈值或用户选择手动复核
+    act:
+      - 用户逐项检查识别结果
+      - 修正错误的指标值或名称
+      - 点击"确认保存"
+    expect:
+      - 修正后的数据保存到数据库
+      - 跳转到报告详情页
+      - 报告状态变为"已确认"
+
+  - id: FUNC-005
+    title: 查看历史健康报告
+    page: ReportList
+    source: FLOW-001
+    ctx:
+      - 用户已登录
+      - 数据库中有已确认的健康报告
+    act:
+      - 用户进入"健康报告"页面
+      - 可按日期范围、报告类型筛选
+    expect:
+      - 列表展示所有报告（日期、类型、标题、状态）
+      - 点击可进入详情页查看结构化数据
+      - 支持按日期排序（默认最新在前）
+
+  - id: FUNC-006
+    title: 单专科 AI 咨询
+    page: SpecialistConsult
+    source: FLOW-002
+    ctx:
+      - 用户已登录
+      - 已配置 API Key
+      - 有历史健康数据
+    act:
+      - 用户选择"单专科咨询"
+      - 选择科室（如心内科）
+      - 输入咨询问题
+      - 可选关联相关报告
+      - 点击"提交咨询"
+    expect:
+      - 显示"AI 分析中"状态
+      - 完成后展示专科分析报告
+      - 报告含安全声明"仅供参考，不作为医疗诊断依据"
+
+  - id: FUNC-007
+    title: MDT 多学科会诊
+    page: MDTConsult
+    source: FLOW-002
+    ctx:
+      - 用户已登录
+      - 已配置 API Key
+    act:
+      - 用户选择"MDT 多学科会诊"
+      - 勾选多个科室（≥3）
+      - 输入主诉
+      - 点击"提交会诊"
+    expect:
+      - 并行调用多个专科 AI 分析
+      - 展示综合会诊报告（各专科意见 + 综合建议）
+      - 注明参与的专科列表
+
+  - id: FUNC-008
+    title: 添加用药记录
+    page: MedicationForm
+    source: FLOW-003
+    ctx:
+      - 用户已登录
+    act:
+      - 用户点击"添加用药"
+      - 填写药品名、剂量、频率、用法、起止日期
+      - 点击保存
+    expect:
+      - 用药记录出现在用药列表中
+      - 状态默认为"使用中"
+      - 自动触发药物相互作用检测
+
+  - id: FUNC-009
+    title: 药物相互作用检测与预警
+    page: MedicationList
+    source: FLOW-003
+    ctx:
+      - 用户有多个 active 状态的用药记录
+      - 存在已知的药物相互作用
+    act:
+      - 用户进入"用药管理"页面
+      - 系统自动检测当前用药组合
+      - 或用户手动点击"检测相互作用"
+    expect:
+      - 按严重程度分级展示：
+        - X 级（禁忌）：红色警告卡片，顶部突出显示
+        - D 级（考虑调整）：橙色警告
+        - C 级（需监测）：黄色提示
+        - A/B 级：灰色信息条
+      - 每条展示：药物对、严重程度、机制说明、管理建议
+
+  - id: FUNC-010
+    title: 管理用药状态
+    page: MedicationList
+    source: FLOW-003
+    ctx:
+      - 用户有活跃的用药记录
+    act:
+      - 用户将某用药标记为"已停用"或"已完成"
+    expect:
+      - 用药状态更新
+      - 停用的药物不再参与相互作用检测
+      - 可筛选查看不同状态的用药
+
+  - id: FUNC-011
+    title: 健康指标趋势图
+    page: HealthTrend
+    source: FLOW-004
+    ctx:
+      - 用户有 ≥ 2 次同指标的历史记录
+    act:
+      - 用户进入"健康趋势"页面
+      - 选择指标（如空腹血糖）
+      - 选择时间范围（如 6 个月）
+      - 点击"生成趋势"
+    expect:
+      - 显示折线图（x 轴=日期，y 轴=数值）
+      - 参考范围区间以浅色背景标注
+      - 异常值点高亮显示
+      - 展示趋势方向标签（上升/下降/稳定/波动）
+      - 显示统计摘要（均值、最小值、最大值、异常次数）
+
+  - id: FUNC-012
+    title: 无数据时的趋势页面
+    page: HealthTrend
+    source: BND-018
+    ctx:
+      - 新用户，无历史指标数据
+    act:
+      - 用户进入"健康趋势"页面
+    expect:
+      - 展示空状态插图和提示文字
+      - 引导用户上传第一份检查单
+
+  - id: FUNC-013
+    title: 编辑个人档案
+    page: ProfilePage
+    source: FLOW-005
+    ctx:
+      - 用户已登录
+    act:
+      - 用户点击导航栏头像 → 个人设置
+      - 修改身高、体重、出生日期等信息
+      - 点击保存
+    expect:
+      - 档案信息更新
+      - 导航栏显示名称更新
+
+  - id: FUNC-014
+    title: 管理过敏史
+    page: AllergyPage
+    source: FLOW-005
+    ctx:
+      - 用户已登录
+    act:
+      - 用户进入"过敏史"页面
+      - 添加过敏原、严重程度、反应描述
+      - 可编辑/删除已有记录
+    expect:
+      - 过敏列表正确展示
+      - 严重过敏（severe/life_threatening）红色标记
+
+  - id: FUNC-015
+    title: 配置 API Key
+    page: SettingsPage
+    source: FLOW-005
+    ctx:
+      - 用户已登录
+      - 尚未配置 API Key
+    act:
+      - 用户进入"设置"页面
+      - 输入 Anthropic API Key
+      - 点击"验证并保存"
+    expect:
+      - 后端调用 API 验证 Key 有效性
+      - 验证通过后加密保存到数据库
+      - 显示"配置成功"提示
+      - AI 功能入口不再显示配置引导
+
+  - id: FUNC-016
+    title: 首页仪表盘概览
+    page: Dashboard
+    source: FLOW-005
+    ctx:
+      - 用户已登录
+      - 有历史健康数据
+    act:
+      - 用户登录进入首页
+    expect:
+      - 展示概览卡片：
+        - 最近报告（最新 3 条）
+        - 活跃用药数量
+        - 异常指标数量
+        - 最近咨询记录
+      - 点击卡片可跳转到对应模块
+
+  - id: FUNC-017
+    title: 数据迁移（首次启动）
+    page: CLI / 启动脚本
+    source: FLOW-006
+    ctx:
+      - 系统首次启动
+      - data/ 目录存在 JSON 文件
+    act:
+      - 用户运行 npm start 启动 Web 应用
+    expect:
+      - 自动检测并创建 SQLite 数据库
+      - 迁移现有 JSON 数据到 SQLite
+      - 控制台输出迁移进度
+      - 迁移完成后启动 Web 服务
+
+  - id: FUNC-018
+    title: 创建老年综合评估 (CGA)
+    page: CGAAssessment
+    source: FLOW-007
+    ctx:
+      - 用户已登录
+      - 已配置 API Key
+    act:
+      - 用户进入"老年综合评估"页面
+      - 点击"新建评估"
+      - 逐项填写各维度：ADL(10项)、IADL(8项)、衰弱(5项)、营养(6项)、认知快速筛查、抑郁(15项)、跌倒(6项)、社会支持
+      - 点击"提交 AI 分析"
+    expect:
+      - 各维度自动计算得分
+      - AI 生成综合评估摘要（主要问题领域 + 优势领域）
+      - AI 生成个性化干预建议
+      - 展示 CGA 综合报告（各维度雷达图 + 得分汇总 + AI 建议）
+      - 报告状态变为"已完成"
+
+  - id: FUNC-019
+    title: CGA 评估的分步填写与暂存
+    page: CGAAssessment
+    source: FLOW-007
+    ctx:
+      - 用户已登录
+      - CGA 评估处于草稿或评估中状态
+    act:
+      - 用户填写部分维度后离开页面
+      - 稍后返回继续填写
+    expect:
+      - 已填写的维度数据自动保存
+      - 返回后可从未完成的维度继续
+      - 所有维度填写完毕前"提交 AI 分析"按钮置灰
+
+  - id: FUNC-020
+    title: 阿尔茨海默/认知筛查 - AD8 初筛
+    page: CognitiveScreening
+    source: FLOW-008
+    ctx:
+      - 用户已登录
+      - 有知情者/照护者可用
+    act:
+      - 用户选择筛查工具"AD8"
+      - 知情者回答 8 个关于被评估者认知变化的问题
+      - 提交问卷
+    expect:
+      - 自动计算 AD8 得分（≥2 分提示需进一步评估）
+      - 如有 AI Key，生成筛查解读和建议
+      - 报告状态变为"已完成"
+
+  - id: FUNC-021
+    title: 认知筛查 - MMSE 全面评估
+    page: CognitiveScreening
+    source: FLOW-008
+    ctx:
+      - 用户已登录
+      - AI Key 已配置
+    act:
+      - 用户选择筛查工具"MMSE"
+      - 逐题作答 30 道题目（定向力/记忆力/注意力/语言/视空间）
+      - 输入受教育年限
+      - 提交问卷
+    expect:
+      - 自动计算总分（满分 30）
+      - 按受教育程度自动校正判定标准
+      - AI 生成解读（正常/临界/受损/严重受损）
+      - 如有历史筛查记录，展示分数变化对比
+
+  - id: FUNC-022
+    title: 认知筛查 - CDR 临床痴呆评定
+    page: CognitiveScreening
+    source: FLOW-008
+    ctx:
+      - 用户已登录
+      - 同时有本人和知情者参与
+    act:
+      - 用户选择筛查工具"CDR"
+      - 分别填写本人和知情者访谈（6 个维度：记忆/定向/判断/社区/家居/自理）
+      - 提交
+    expect:
+      - 自动计算 CDR 总体评分（0/0.5/1/2/3）
+      - 展示六域评分明细
+      - AI 生成综合解读和随访建议
+
+  - id: FUNC-023
+    title: 认知筛查纵向跟踪对比
+    page: CognitiveScreening
+    source: FLOW-008
+    ctx:
+      - 用户有 ≥ 2 次认知筛查历史记录
+    act:
+      - 用户查看最新筛查报告
+    expect:
+      - 展示历史筛查分数趋势折线图
+      - 标注每次筛查的工具类型、日期、分数变化箭头
+      - AI 解读中包含纵向对比分析（如"较 6 个月前 MMSE 下降 2 分，建议缩短复查间隔"）
+
+  # ===== EDGE 边界/异常验收 =====
+  - id: EDGE-001
+    title: 超大文件上传被拦截
+    source: BND-001
+    ctx:
+      - 用户选择 > 20MB 的图片
+    act:
+      - 尝试上传
+    expect:
+      - 前端显示"图片大小不能超过 20MB，请压缩后重试"
+      - 文件不会发送到后端
+
+  - id: EDGE-002
+    title: 未配置 API Key 时使用 AI 功能
+    source: BND-012
+    ctx:
+      - 用户已登录
+      - 未配置 API Key
+    act:
+      - 用户尝试上传检查单或发起咨询
+    expect:
+      - 显示引导弹窗"请先配置 API Key"
+      - 提供跳转到设置页面的按钮
+      - AI 功能按钮置灰
+
+  - id: EDGE-003
+    title: AI 调用超时处理
+    source: BND-015
+    ctx:
+      - Anthropic API 响应超过 60s
+    act:
+      - 用户发起 AI 识别或咨询
+    expect:
+      - 60s 后显示"AI 分析超时，请稍后重试"
+      - 提供"重试"按钮
+      - 不丢失已输入的数据
+
+  - id: EDGE-004
+    title: 会话过期自动跳转
+    source: BND-016
+    ctx:
+      - 用户已登录但 JWT Token 过期
+    act:
+      - 用户执行任何需要认证的操作
+    expect:
+      - API 返回 401
+      - 前端自动跳转到登录页
+      - 显示提示"登录已过期，请重新登录"
+
+  - id: EDGE-005
+    title: 跨用户数据隔离
+    source: BND-021
+    ctx:
+      - 用户 A 已登录
+    act:
+      - 用户 A 修改 URL 中的 report_id 参数试图访问用户 B 的报告
+    expect:
+      - 后端返回 403 Forbidden
+      - 前端显示"无权访问该资源"
+
+  - id: EDGE-006
+    title: 空表单提交拦截
+    source: BND-003
+    ctx:
+      - 用户在用药表单中未填写药品名
+    act:
+      - 点击保存
+    expect:
+      - 前端显示校验错误"药品名称不能为空"
+      - 表单不提交
+
+  - id: EDGE-007
+    title: SQL 注入被防护
+    source: BND-006
+    ctx:
+      - 用户在搜索框输入 SQL 注入语句
+    act:
+      - 提交搜索
+    expect:
+      - 查询正常执行
+      - 注入语句被当作普通搜索文本处理
+      - 无数据泄露或错误
+
+  - id: EDGE-008
+    title: 药物相互作用数据库缺失
+    source: BND-019
+    ctx:
+      - 相互作用规则数据库文件不存在
+    act:
+      - 用户添加用药后触发检测
+    expect:
+      - 提示"相互作用数据库未加载"
+      - 用药管理功能不受影响
+      - 不显示错误页面
+
+  # ===== UI 验收 =====
+  - id: UI-001
+    title: 响应式布局 - 移动端适配
+    page: all
+    ctx:
+      - 使用手机浏览器访问
+    act:
+      - 查看各页面布局
+    expect:
+      - 导航菜单折叠为汉堡菜单
+      - 表格支持横向滚动
+      - 表单字段全宽排列
+      - 按钮尺寸适合手指点击 (≥ 44px)
+
+  - id: UI-002
+    title: SPA 路由导航
+    page: all
+    ctx:
+      - 用户已登录
+    act:
+      - 点击左侧导航菜单切换模块
+    expect:
+      - URL hash 变化（如 #/reports, #/medications）
+      - 页面内容无刷新切换
+      - 当前模块菜单项高亮
+      - 浏览器前进/后退按钮正常工作
+
+  - id: UI-003
+    title: 加载状态展示
+    page: all
+    ctx:
+      - 用户触发需要等待的操作
+    act:
+      - 观察加载过程
+    expect:
+      - 按钮变为 loading 状态（置灰 + 旋转图标）
+      - 数据表格显示骨架屏
+      - 长时间操作显示进度百分比或预计时间

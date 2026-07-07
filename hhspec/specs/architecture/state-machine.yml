@@ -1,0 +1,360 @@
+# State Machine: web-frontend
+# WellAlly Health Web 前端界面 - 状态机定义
+# 基于 Phase 2 需求探索的 5 个核心模块
+
+meta:
+  generated_by: "pd:explore Phase 3.1"
+  change_name: "web-frontend"
+  mode: "bootstrap"
+  created_at: "2026-07-07T15:30:00Z"
+
+state_machines:
+  - id: health_report_lifecycle
+    name: 健康报告生命周期
+    entity: HealthReport
+    description: 从上传到可查看的完整流转
+    states:
+      - id: uploaded
+        label: 已上传
+        description: 用户上传检查单图片，等待 AI 识别
+      - id: ai_processing
+        label: AI 识别中
+        description: AI 正在提取结构化数据
+      - id: processed
+        label: 已识别
+        description: AI 识别完成，数据已结构化存储
+      - id: review_needed
+        label: 待复核
+        description: AI 置信度低，需要用户人工复核
+      - id: confirmed
+        label: 已确认
+        description: 用户确认数据准确，报告可查看
+      - id: failed
+        label: 识别失败
+        description: AI 识别失败，需重新上传或手动录入
+    transitions:
+      - from: uploaded
+        to: ai_processing
+        trigger: start_ai_extraction
+        description: 用户点击"开始识别"或自动触发
+      - from: ai_processing
+        to: processed
+        trigger: ai_extraction_success
+        guard: confidence >= threshold
+        description: AI 识别成功且置信度达标
+      - from: ai_processing
+        to: review_needed
+        trigger: ai_extraction_success
+        guard: confidence < threshold
+        description: AI 识别成功但置信度低
+      - from: ai_processing
+        to: failed
+        trigger: ai_extraction_error
+        description: AI 识别异常
+      - from: review_needed
+        to: confirmed
+        trigger: user_review_confirm
+        description: 用户复核确认数据
+      - from: processed
+        to: confirmed
+        trigger: user_confirm
+        description: 用户确认数据
+      - from: failed
+        to: uploaded
+        trigger: re_upload
+        description: 重新上传图片
+      - from: any
+        to: deleted
+        trigger: delete_report
+        description: 删除报告（终态）
+
+  - id: specialist_consultation_lifecycle
+    name: 专科咨询生命周期
+    entity: SpecialistConsultation
+    description: 单专科或 MDT 咨询的请求-响应流程
+    states:
+      - id: draft
+        label: 草稿
+        description: 用户正在填写咨询内容
+      - id: pending
+        label: 等待处理
+        description: 咨询已提交，排队等待 AI 处理
+      - id: processing
+        label: AI 分析中
+        description: AI 正在分析并生成回复
+      - id: completed
+        label: 已完成
+        description: AI 分析完成，结果可查看
+      - id: failed
+        label: 分析失败
+        description: AI 调用异常或超时
+    transitions:
+      - from: draft
+        to: pending
+        trigger: submit_consultation
+        description: 用户提交咨询
+      - from: pending
+        to: processing
+        trigger: start_ai_analysis
+        description: 系统开始调用 AI
+      - from: processing
+        to: completed
+        trigger: ai_analysis_success
+        description: AI 返回分析结果
+      - from: processing
+        to: failed
+        trigger: ai_analysis_error
+        description: API 调用失败或超时
+      - from: failed
+        to: pending
+        trigger: retry
+        description: 用户点击重试
+      - from: draft
+        to: deleted
+        trigger: discard
+        description: 丢弃草稿
+
+  - id: medication_lifecycle
+    name: 用药记录生命周期
+    entity: Medication
+    description: 用药计划的状态管理
+    states:
+      - id: active
+        label: 使用中
+        description: 当前正在服用的药物
+      - id: discontinued
+        label: 已停用
+        description: 医生建议或自行停用
+      - id: completed
+        label: 已完成
+        description: 按疗程完成用药
+      - id: paused
+        label: 已暂停
+        description: 临时暂停用药
+    transitions:
+      - from: active
+        to: discontinued
+        trigger: discontinue
+        description: 停止用药
+      - from: active
+        to: paused
+        trigger: pause
+        description: 暂停用药
+      - from: active
+        to: completed
+        trigger: complete_course
+        description: 完成疗程
+      - from: paused
+        to: active
+        trigger: resume
+        description: 恢复用药
+      - from: paused
+        to: discontinued
+        trigger: discontinue
+        description: 从暂停转为停用
+
+  - id: user_session
+    name: 用户会话
+    entity: User
+    description: Web 界面用户登录会话
+    states:
+      - id: logged_out
+        label: 未登录
+      - id: logging_in
+        label: 登录中
+      - id: logged_in
+        label: 已登录
+    transitions:
+      - from: logged_out
+        to: logging_in
+        trigger: submit_credentials
+      - from: logging_in
+        to: logged_in
+        trigger: auth_success
+      - from: logging_in
+        to: logged_out
+        trigger: auth_failure
+      - from: logged_in
+        to: logged_out
+        trigger: logout
+      - from: logged_in
+        to: logged_out
+        trigger: session_expired
+
+  - id: ai_configuration
+    name: AI 配置状态
+    entity: User (api_key_encrypted)
+    description: 用户 Anthropic API Key 配置状态
+    states:
+      - id: not_configured
+        label: 未配置
+        description: 用户尚未设置 API Key
+      - id: configured
+        label: 已配置
+        description: API Key 已保存
+      - id: verified
+        label: 已验证
+        description: API Key 经测试可用
+      - id: invalid
+        label: 无效
+        description: API Key 验证失败
+    transitions:
+      - from: not_configured
+        to: configured
+        trigger: save_api_key
+        description: 保存 API Key
+      - from: configured
+        to: verified
+        trigger: verify_success
+        description: API Key 验证通过
+      - from: configured
+        to: invalid
+        trigger: verify_failure
+        description: API Key 验证失败
+      - from: invalid
+        to: configured
+        trigger: update_api_key
+        description: 更新 API Key
+      - from: verified
+        to: invalid
+        trigger: api_call_failure
+        description: 实际调用时发现 Key 失效
+
+  - id: interaction_check_lifecycle
+    name: 药物相互作用检测生命周期
+    entity: DrugInteractionRecord
+    description: 相互作用检测流程
+    states:
+      - id: idle
+        label: 未检测
+      - id: checking
+        label: 检测中
+        description: 系统正在分析当前用药组合
+      - id: no_interaction
+        label: 无相互作用
+        description: 未发现已知相互作用
+      - id: interactions_found
+        label: 发现相互作用
+        description: 检测到相互作用，按严重程度分级展示
+      - id: check_failed
+        label: 检测失败
+    transitions:
+      - from: idle
+        to: checking
+        trigger: start_check
+        description: 触发相互作用检测
+      - from: checking
+        to: no_interaction
+        trigger: check_complete
+        guard: interaction_count == 0
+      - from: checking
+        to: interactions_found
+        trigger: check_complete
+        guard: interaction_count > 0
+      - from: checking
+        to: check_failed
+        trigger: check_error
+      - from: interactions_found
+        to: checking
+        trigger: recheck
+        description: 药物变更后重新检测
+
+  - id: cga_assessment_lifecycle
+    name: 老年综合评估生命周期
+    entity: CGAAssessment
+    description: CGA 评估从创建到完成的流转
+    states:
+      - id: draft
+        label: 草稿
+        description: 评估已创建，等待填写各维度数据
+      - id: in_progress
+        label: 评估中
+        description: 正在逐维度填写评估数据
+      - id: ai_analyzing
+        label: AI 分析中
+        description: 各维度评分完成，AI 正在生成综合评估摘要和建议
+      - id: completed
+        label: 已完成
+        description: AI 分析完成，结果可查看
+      - id: reviewed
+        label: 已复核
+        description: 用户/医生已复核评估结果
+    transitions:
+      - from: draft
+        to: in_progress
+        trigger: start_assessment
+        description: 开始逐项评估
+      - from: in_progress
+        to: ai_analyzing
+        trigger: submit_for_analysis
+        description: 所有维度填写完毕，提交 AI 分析
+      - from: ai_analyzing
+        to: completed
+        trigger: ai_analysis_success
+        description: AI 返回综合评估结果
+      - from: ai_analyzing
+        to: in_progress
+        trigger: ai_analysis_error
+        description: AI 分析失败，返回继续编辑
+      - from: completed
+        to: reviewed
+        trigger: user_review_confirm
+        description: 用户确认评估结果
+      - from: draft
+        to: deleted
+        trigger: discard
+        description: 丢弃未完成的评估
+
+  - id: cognitive_screening_lifecycle
+    name: 认知筛查生命周期
+    entity: CognitiveScreening
+    description: 从选择筛查工具到获取分析结果
+    states:
+      - id: tool_selection
+        label: 选择筛查工具
+        description: 选择 AD8/MMSE/MoCA/CDR 等筛查工具
+      - id: questionnaire
+        label: 问卷填写中
+        description: 用户或知情者正在填写量表
+      - id: scored
+        label: 已评分
+        description: 量表填写完成，自动计算各项得分
+      - id: ai_analyzing
+        label: AI 分析中
+        description: AI 综合分析筛查结果并生成建议
+      - id: completed
+        label: 已完成
+        description: 筛查报告可查看（含风险等级和随访建议）
+      - id: reviewed
+        label: 已复核
+        description: 用户/医生已复核筛查报告
+    transitions:
+      - from: tool_selection
+        to: questionnaire
+        trigger: start_questionnaire
+        description: 选定工具后开始作答
+      - from: questionnaire
+        to: scored
+        trigger: complete_questionnaire
+        description: 全部题目作答完毕
+      - from: scored
+        to: ai_analyzing
+        trigger: request_ai_analysis
+        description: 请求 AI 综合解读
+      - from: scored
+        to: completed
+        trigger: skip_ai
+        description: 不需要 AI 解读，直接查看评分
+      - from: ai_analyzing
+        to: completed
+        trigger: ai_analysis_success
+      - from: ai_analyzing
+        to: scored
+        trigger: ai_analysis_error
+        description: AI 分析失败，可重新请求
+      - from: completed
+        to: reviewed
+        trigger: user_review_confirm
+      - from: tool_selection
+        to: deleted
+        trigger: discard
