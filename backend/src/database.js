@@ -233,6 +233,7 @@ export function initDatabase() {
   // Migrations for existing databases
   try { db.exec('ALTER TABLE medications ADD COLUMN timing TEXT DEFAULT \'any\''); } catch {}
   try { db.exec('ALTER TABLE medications ADD COLUMN schedule_times TEXT'); } catch {}
+  try { db.exec('ALTER TABLE medications ADD COLUMN spec_per_pill_mg REAL'); } catch {}
   try { db.exec('ALTER TABLE cga_assessments ADD COLUMN cognitive_quick_data TEXT'); } catch {}
   try { db.exec('ALTER TABLE cga_assessments ADD COLUMN social_data TEXT'); } catch {}
 

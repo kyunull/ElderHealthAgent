@@ -1,17 +1,16 @@
 <template>
   <span class="voice-input-wrapper">
     <el-button
-      :type="isRecording ? 'danger' : 'default'"
-      :disabled="!supported"
-      circle
+      v-if="supported"
+      :type="isRecording ? 'danger' : ''"
       size="small"
       @click="toggleRecording"
-      :title="supported ? '语音输入' : '当前浏览器不支持语音识别'"
+      class="voice-btn"
+      :class="{ recording: isRecording }"
     >
-      <span v-if="!isRecording">🎤</span>
-      <span v-else class="recording-pulse">🔴</span>
+      <span v-if="!isRecording">🎤 语音输入</span>
+      <span v-else class="recording-text">🔴 点击停止</span>
     </el-button>
-    <span v-if="isRecording" class="recording-hint">正在聆听...</span>
   </span>
 </template>
 
@@ -43,13 +42,9 @@ onMounted(() => {
 
     recognition.onresult = (event) => {
       let finalTranscript = '';
-      let interimTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          finalTranscript += transcript;
-        } else {
-          interimTranscript += transcript;
+          finalTranscript += event.results[i][0].transcript;
         }
       }
       if (finalTranscript) {
@@ -102,19 +97,25 @@ function toggleRecording() {
 .voice-input-wrapper {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   vertical-align: middle;
+  flex-shrink: 0;
 }
-.recording-pulse {
-  animation: pulse 1s infinite;
+.voice-btn {
+  border-radius: 8px;
+  border-color: #d3d9de;
+  font-size: 13px;
+  padding: 5px 12px;
+  white-space: nowrap;
 }
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+.voice-btn.recording {
+  animation: voice-pulse 1.2s infinite;
+  border-color: #f56c6c;
 }
-.recording-hint {
-  font-size: 12px;
-  color: #f56c6c;
-  font-weight: 500;
+.recording-text {
+  font-weight: 600;
+}
+@keyframes voice-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 108, 108, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(245, 108, 108, 0); }
 }
 </style>

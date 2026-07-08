@@ -275,10 +275,35 @@
       </el-tabs>
     </el-card>
 
-    <!-- Result Dialog -->
-    <el-dialog v-model="showResult" title="AI 分析结果" width="680px" top="5vh">
-      <div v-if="resultContent" style="line-height:1.8;white-space:pre-wrap">{{ resultContent }}</div>
+    <!-- Result Dialog with Follow-up Chat -->
+    <el-dialog v-model="showResult" :title="currentConsultTitle || 'AI 分析结果'" width="760px" top="3vh" @close="closeResult">
+      <div v-if="resultContent" style="margin-bottom:20px">
+        <div style="line-height:1.9;white-space:pre-wrap;font-size:15px;background:#fafbfc;border-radius:10px;padding:20px;border-left:4px solid #409eff">{{ resultContent }}</div>
+      </div>
       <el-empty v-else description="暂无分析内容" />
+
+      <!-- Follow-up Q&A Section -->
+      <div v-if="resultContent && currentConsultId" style="border-top:1px solid #ebeef5;padding-top:16px">
+        <h4 style="margin:0 0 6px;color:#303133">💬 继续咨询</h4>
+        <p style="font-size:13px;color:#909399;margin:0 0 12px">针对分析内容，您可以继续追问，我会结合慢病管理知识为您解答。</p>
+
+        <!-- Chat messages -->
+        <div v-if="followUpMessages.length > 0" style="max-height:320px;overflow-y:auto;margin-bottom:12px;background:#fafafa;border-radius:8px;padding:12px">
+          <div v-for="(msg, idx) in followUpMessages" :key="idx" style="margin-bottom:12px;display:flex;flex-direction:column;align-items:flex-start">
+            <div v-if="msg.role === 'user'" style="align-self:flex-end;max-width:80%;background:#409eff;color:#fff;border-radius:12px 12px 0 12px;padding:10px 14px;font-size:14px;line-height:1.6">{{ msg.content }}</div>
+            <div v-else style="max-width:85%;background:#fff;border:1px solid #e4e7ed;border-radius:12px 12px 12px 0;padding:10px 14px;font-size:14px;line-height:1.7;white-space:pre-wrap">{{ msg.content }}</div>
+            <div style="font-size:11px;color:#c0c4cc;margin-top:2px;align-self:flex-end" v-if="msg.role === 'user'">{{ msg.time }}</div>
+            <div style="font-size:11px;color:#c0c4cc;margin-top:2px" v-else>{{ msg.time }}</div>
+          </div>
+        </div>
+
+        <!-- Follow-up input -->
+        <div style="display:flex;gap:8px">
+          <el-input v-model="followUpInput" placeholder="在这里输入您的追问，如：我这种情况需要做什么检查？" @keyup.enter="sendFollowUp" :disabled="followUpLoading" style="flex:1" />
+          <el-button type="primary" @click="sendFollowUp" :loading="followUpLoading">发送</el-button>
+        </div>
+        <div v-if="followUpKnowledge" style="font-size:12px;color:#67c23a;margin-top:6px">已匹配知识库：{{ followUpKnowledge }}</div>
+      </div>
     </el-dialog>
   </div>
 </template>
@@ -302,6 +327,12 @@ const step = ref(0);
 const showTemplate = ref(false);
 const showResult = ref(false);
 const resultContent = ref('');
+const currentConsultId = ref(null);
+const currentConsultTitle = ref('');
+const followUpInput = ref('');
+const followUpLoading = ref(false);
+const followUpMessages = ref([]);
+const followUpKnowledge = ref('');
 
 const statusMap = { pending: '等待中', processing: '分析中', completed: '已完成', failed: '失败' };
 
@@ -507,6 +538,10 @@ async function fetchResult(id) {
     const item = data.find(c => c.id === id);
     if (item?.ai_response) {
       resultContent.value = item.ai_response;
+      currentConsultId.value = item.id;
+      currentConsultTitle.value = item.mdt_specialties
+        ? 'MDT 会诊 — ' + JSON.parse(item.mdt_specialties).map(specialtyLabel).join('、')
+        : '单专科咨询 — ' + specialtyLabel(item.specialty);
     }
   } catch (err) {
     processError.value = err?.response?.data?.error || 'AI 分析失败，请检查 API 配置后重试。';
@@ -519,7 +554,57 @@ function viewResult() {
 
 function viewHistoryItem(row) {
   resultContent.value = row.ai_response || '暂无分析内容';
+  currentConsultId.value = row.id;
+  currentConsultTitle.value = row.mdt_specialties
+    ? 'MDT 会诊 — ' + JSON.parse(row.mdt_specialties).map(specialtyLabel).join('、')
+    : '单专科咨询 — ' + specialtyLabel(row.specialty);
+  followUpMessages.value = [];
+  followUpKnowledge.value = '';
   showResult.value = true;
+}
+
+function closeResult() {
+  followUpMessages.value = [];
+  followUpInput.value = '';
+  followUpKnowledge.value = '';
+}
+
+async function sendFollowUp() {
+  const q = followUpInput.value.trim();
+  if (!q || !currentConsultId.value) return;
+
+  const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  followUpMessages.value.push({ role: 'user', content: q, time });
+  followUpInput.value = '';
+  followUpLoading.value = true;
+
+  try {
+    const history = followUpMessages.value
+      .filter(m => m.role !== 'knowledge')
+      .map(m => ({ role: m.role, content: m.content }));
+
+    const { data } = await api.post(`/consultations/${currentConsultId.value}/follow-up`, {
+      question: q,
+      conversation_history: history.slice(0, -1) // exclude the current question
+    });
+
+    followUpMessages.value.push({
+      role: 'assistant',
+      content: data.response,
+      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    });
+    if (data.knowledge_used) {
+      followUpKnowledge.value = data.knowledge_used;
+    }
+  } catch (err) {
+    followUpMessages.value.push({
+      role: 'assistant',
+      content: '抱歉，暂时无法回复您的问题。请稍后再试，或检查 AI API 配置。',
+      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    });
+  } finally {
+    followUpLoading.value = false;
+  }
 }
 
 async function loadHistory() {

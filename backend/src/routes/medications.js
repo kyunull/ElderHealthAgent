@@ -1,8 +1,23 @@
 import { Router } from 'express';
 import { getDb } from '../database.js';
 import { AppError } from '../middleware/error-handler.js';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const router = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new AppError(400, '仅支持 JPG、PNG、WebP 格式的图片'));
+  }
+});
 
 // Route display map
 const ROUTE_MAP = {
@@ -156,7 +171,7 @@ router.get('/schedule', (req, res, next) => {
 
 router.post('/', (req, res, next) => {
   try {
-    const { drug_name, generic_name, dosage, dosage_unit, frequency, route, start_date, end_date, notes } = req.body;
+    const { drug_name, generic_name, dosage, dosage_unit, spec_per_pill_mg, frequency, route, start_date, end_date, notes } = req.body;
     if (!drug_name || !dosage || !frequency || !start_date) {
       throw AppError.validation({ form: '药品名、剂量、频率和开始日期为必填项' });
     }
@@ -164,9 +179,11 @@ router.post('/', (req, res, next) => {
     const freq = parseFrequency(frequency);
     const db = getDb();
     const result = db.prepare(
-      `INSERT INTO medications (user_id, drug_name, generic_name, dosage, dosage_unit, frequency, route, start_date, end_date, timing, schedule_times, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(req.user.id, drug_name, generic_name || null, dosage, dosage_unit || null, frequency, route || 'oral',
+      `INSERT INTO medications (user_id, drug_name, generic_name, dosage, dosage_unit, spec_per_pill_mg, frequency, route, start_date, end_date, timing, schedule_times, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(req.user.id, drug_name, generic_name || null, dosage, dosage_unit || null,
+      spec_per_pill_mg ? parseFloat(spec_per_pill_mg) : null,
+      frequency, route || 'oral',
       start_date, end_date || null, freq.timing, freq.scheduleTimes, notes || null);
 
     const medication = db.prepare('SELECT * FROM medications WHERE id = ?').get(result.lastInsertRowid);
@@ -183,7 +200,7 @@ router.put('/:id', (req, res, next) => {
     const med = db.prepare('SELECT * FROM medications WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
     if (!med) throw AppError.notFound('用药记录');
 
-    const { drug_name, generic_name, dosage, dosage_unit, frequency, route, start_date, end_date, notes, status } = req.body;
+    const { drug_name, generic_name, dosage, dosage_unit, spec_per_pill_mg, frequency, route, start_date, end_date, notes, status } = req.body;
 
     // Support both partial status-only updates and full-field updates
     const updates = {};
@@ -191,6 +208,7 @@ router.put('/:id', (req, res, next) => {
     if (generic_name !== undefined) updates.generic_name = generic_name || null;
     if (dosage !== undefined) updates.dosage = dosage;
     if (dosage_unit !== undefined) updates.dosage_unit = dosage_unit || null;
+    if (spec_per_pill_mg !== undefined) updates.spec_per_pill_mg = spec_per_pill_mg ? parseFloat(spec_per_pill_mg) : null;
     if (frequency !== undefined) {
       updates.frequency = frequency;
       const freq = parseFrequency(frequency);
@@ -255,6 +273,196 @@ router.post('/interactions/check', (req, res, next) => {
     const d_count = interactions.filter(i => i.severity === 'D').length;
 
     res.json({ interactions, total_count: interactions.length, x_count, d_count });
+  } catch (err) { next(err); }
+});
+
+// OCR recognize medicine bottle/label
+router.post('/ocr-recognize', upload.single('image'), async (req, res, next) => {
+  try {
+    if (!req.file) throw AppError.validation({ image: '请上传药瓶或药品说明书照片' });
+
+    const db = getDb();
+    const user = db.prepare('SELECT api_key_encrypted FROM users WHERE id = ?').get(req.user.id);
+    if (!user?.api_key_encrypted) {
+      throw new Error('未配置 AI API Key，请在设置中配置后使用拍照识别功能');
+    }
+
+    const apiKey = Buffer.from(user.api_key_encrypted, 'base64').toString('utf-8');
+    const modelCfg = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'anthropic_model'").get();
+    const baseUrlCfg = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'anthropic_base_url'").get();
+    const model = modelCfg?.config_value || 'claude-sonnet-5';
+    const baseUrl = baseUrlCfg?.config_value || 'https://api.anthropic.com';
+
+    const base64Image = req.file.buffer.toString('base64');
+    const mimeType = req.file.mimetype;
+
+    const prompt = `你是一个药品信息识别助手。请识别这张药瓶/药品包装/药品说明书照片中的信息。
+
+请提取以下信息并以JSON格式返回（无法识别的字段用 null）：
+{
+  "drug_name": "药品商品名（如：络活喜）",
+  "generic_name": "通用名/化学成分（如：苯磺酸氨氯地平片）",
+  "spec_per_pill": "每片规格（mg数，纯数字，如：5）",
+  "spec_unit": "规格单位，通常为mg",
+  "manufacturer": "生产厂家",
+  "usage_direction": "说明书中的用法用量描述",
+  "indications": "适应症简述",
+  "warnings": "重要注意事项",
+  "confidence": "识别置信度 high/medium/low"
+}
+
+注意：
+- 请仔细阅读药瓶或包装上的文字
+- 剂量数字要精确，区分"5mg"和"50mg"等
+- 如果文字模糊不清，把confidence设为low并在相应字段如实反映
+- 只返回JSON，不要加其他文字`;
+
+    const resp = await fetch(`${baseUrl}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 2048,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64Image } },
+            { type: 'text', text: prompt }
+          ]
+        }]
+      })
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => '');
+      throw new Error(`AI API error ${resp.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const result = await resp.json();
+    const textContent = result.content?.find(c => c.type === 'text')?.text
+      || result.content?.[0]?.text
+      || result.choices?.[0]?.message?.content || '';
+
+    // Extract JSON from response
+    let drugInfo;
+    try {
+      const jsonMatch = textContent.match(/\{[\s\S]*\}/);
+      drugInfo = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+    } catch {
+      drugInfo = null;
+    }
+
+    if (!drugInfo || !drugInfo.drug_name) {
+      // Return raw text if JSON parsing failed
+      drugInfo = { drug_name: null, generic_name: null, spec_per_pill: null, spec_unit: 'mg', raw_text: textContent, confidence: 'low' };
+    }
+
+    // Calculate pill conversion
+    let pillConversion = null;
+    if (drugInfo.spec_per_pill && drugInfo.spec_unit === 'mg') {
+      pillConversion = {
+        per_pill_mg: drugInfo.spec_per_pill,
+        common_dosages: generatePillConversion(drugInfo.spec_per_pill)
+      };
+    }
+
+    res.json({ drug_info: drugInfo, pill_conversion: pillConversion });
+  } catch (err) { next(err); }
+});
+
+// Generate friendly pill conversion table
+function generatePillConversion(mgPerPill) {
+  const mg = parseFloat(mgPerPill);
+  if (!mg || mg <= 0) return null;
+
+  const commonTargets = [5, 10, 20, 25, 50, 100, 200, 500];
+  const conversions = [];
+
+  for (const target of commonTargets) {
+    const pills = target / mg;
+    if (pills >= 0.25 && pills <= 4 && Number.isInteger(pills * 4)) {
+      // Only include reasonable conversions (quarter pill to 4 pills)
+      const fraction = pills < 1 ? formatFraction(pills) : pills.toString();
+      conversions.push({
+        target_mg: target,
+        pill_count: fraction,
+        readable: `${target}mg = ${fraction}片`
+      });
+    }
+  }
+
+  return conversions;
+}
+
+function formatFraction(value) {
+  if (value === 0.25) return '¼';
+  if (value === 0.5) return '½';
+  if (value === 0.75) return '¾';
+  if (value === 0.125) return '⅛';
+  if (value === 0.3333333333333333) return '⅓';
+  return value.toString();
+}
+
+// Friendly drug info display
+router.post('/friendly-info', (req, res, next) => {
+  try {
+    const { drug_name, generic_name, dosage, dosage_unit, spec_per_pill_mg } = req.body;
+    if (!drug_name || !dosage) throw AppError.validation({ form: '药品名和剂量为必填项' });
+
+    const mgPerPill = parseFloat(spec_per_pill_mg) || 0;
+    const dosageNum = parseFloat(dosage) || 0;
+    const unit = dosage_unit || 'mg';
+
+    let friendly = '';
+    let pillInfo = null;
+
+    // Build friendly description
+    friendly += `${drug_name}`;
+    if (generic_name && generic_name !== drug_name) {
+      friendly += `（通用名：${generic_name}）`;
+    }
+
+    if (unit === 'mg' && mgPerPill > 0) {
+      const pillCount = dosageNum / mgPerPill;
+      if (Number.isInteger(pillCount)) {
+        pillInfo = {
+          mg_per_pill: mgPerPill,
+          pill_count: pillCount,
+          readable: `每次${pillCount}片（每片${mgPerPill}mg，共${dosageNum}mg）`
+        };
+        friendly += `\n每片含${mgPerPill}mg，每次需要吃${pillCount}片，总共${dosageNum}mg。`;
+      } else if (pillCount === 0.5) {
+        pillInfo = {
+          mg_per_pill: mgPerPill,
+          pill_count: '½',
+          readable: `每次半片（每片${mgPerPill}mg，共${dosageNum}mg）`
+        };
+        friendly += `\n每片含${mgPerPill}mg，每次需要吃半片（可以沿刻痕掰开），总共${dosageNum}mg。`;
+      } else if (pillCount === 0.25) {
+        pillInfo = {
+          mg_per_pill: mgPerPill,
+          pill_count: '¼',
+          readable: `每次¼片（每片${mgPerPill}mg，共${dosageNum}mg）`
+        };
+        friendly += `\n每片含${mgPerPill}mg，每次只需要¼片，总量${dosageNum}mg。`;
+      } else {
+        const rounded = Math.round(pillCount * 4) / 4;
+        pillInfo = {
+          mg_per_pill: mgPerPill,
+          pill_count: rounded,
+          readable: `每次约${rounded}片（每片${mgPerPill}mg，共${dosageNum}mg）`
+        };
+        friendly += `\n每片含${mgPerPill}mg，每次需要吃大约${rounded}片（共${dosageNum}mg）。建议和医生或药师确认用量。`;
+      }
+    } else {
+      friendly += `\n每次用量：${dosageNum}${unit}`;
+    }
+
+    res.json({ friendly_message: friendly, pill_info: pillInfo });
   } catch (err) { next(err); }
 });
 
