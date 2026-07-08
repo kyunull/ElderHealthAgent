@@ -32,7 +32,7 @@ router.put('/config', (req, res, next) => {
       if (!val) return;
       const existing = db.prepare('SELECT id FROM system_config WHERE config_key = ?').get(key);
       if (existing) {
-        db.prepare('UPDATE system_config SET config_value = ?, updated_at = datetime("now") WHERE config_key = ?').run(val, key);
+        db.prepare("UPDATE system_config SET config_value = ?, updated_at = datetime('now') WHERE config_key = ?").run(val, key);
       } else {
         db.prepare('INSERT INTO system_config (config_key, config_value) VALUES (?, ?)').run(key, val);
       }

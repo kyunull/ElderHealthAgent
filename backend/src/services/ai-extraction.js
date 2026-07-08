@@ -147,7 +147,7 @@ async function callGLMAPI(base64Image, mimeType, prompt, apiKey, baseUrl, model)
           { type: 'text', text: prompt }
         ]
       }],
-      max_tokens: 4096
+      max_tokens: 2048
     })
   });
   if (!resp.ok) {
@@ -351,21 +351,22 @@ export async function performAIExtraction(imagePath, reportType, reportId, userI
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       );
       for (const ind of extracted.indicators) {
-        insertInd.run(reportId, ind.indicator_name, ind.indicator_code, ind.value, ind.unit,
-          ind.reference_range_low, ind.reference_range_high, ind.reference_range_text,
-          ind.is_abnormal, ind.abnormality_direction);
+        insertInd.run(reportId,
+          ind.indicator_name ?? null, ind.indicator_code ?? null, ind.value ?? null,
+          ind.unit ?? null, ind.reference_range_low ?? null, ind.reference_range_high ?? null,
+          ind.reference_range_text ?? null, ind.is_abnormal ?? 0, ind.abnormality_direction ?? null);
       }
     } else if (reportType === 'imaging' && extracted.findings?.length) {
       const insertFind = db.prepare(
         'INSERT INTO imaging_findings (report_id, body_part, modality, finding, impression) VALUES (?, ?, ?, ?, ?)'
       );
       for (const f of extracted.findings) {
-        insertFind.run(reportId, f.body_part, f.modality, f.finding, f.impression);
+        insertFind.run(reportId, f.body_part ?? null, f.modality ?? null, f.finding ?? null, f.impression ?? null);
       }
     }
 
     if (extracted.hospital) {
-      db.prepare('UPDATE health_reports SET hospital_name = COALESCE(NULLIF(?, ""), hospital_name) WHERE id = ?')
+      db.prepare("UPDATE health_reports SET hospital_name = COALESCE(NULLIF(?, ''), hospital_name) WHERE id = ?")
         .run(extracted.hospital, reportId);
     }
     db.prepare("UPDATE health_reports SET ai_processed = 1, status = 'processed' WHERE id = ?").run(reportId);

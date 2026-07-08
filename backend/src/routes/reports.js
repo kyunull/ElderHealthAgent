@@ -34,6 +34,13 @@ const upload = multer({
 
 const router = Router();
 
+// Fix multer encoding issue: busboy may decode UTF-8 filenames as Latin-1
+function fixEncoding(str) {
+  try {
+    return Buffer.from(str, 'latin1').toString('utf8');
+  } catch { return str; }
+}
+
 router.post('/upload', upload.single('image'), (req, res, next) => {
   try {
     if (!req.file) throw AppError.validation({ image: '请选择检查单图片' });
@@ -52,10 +59,11 @@ router.post('/upload', upload.single('image'), (req, res, next) => {
 
     // Relative path from project root
     const relPath = path.relative(PROJECT_ROOT, req.file.path).replace(/\\/g, '/');
+    const title = fixEncoding(req.file.originalname).replace(/\.[^.]+$/, '');
     const result = db.prepare(
       `INSERT INTO health_reports (user_id, report_type, title, report_date, hospital_name, department, original_image_path, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'uploaded')`
-    ).run(req.user.id, report_type, req.file.originalname, report_date, hospital_name || null, department || null, relPath);
+    ).run(req.user.id, report_type, title, report_date, hospital_name || null, department || null, relPath);
 
     // Async AI extraction
     setImmediate(() => {
@@ -65,7 +73,7 @@ router.post('/upload', upload.single('image'), (req, res, next) => {
     res.status(201).json({
       id: result.lastInsertRowid,
       status: 'uploaded',
-      title: req.file.originalname,
+      title: title,
       image_url: `/api/images/${req.user.id}/${req.file.filename}`
     });
   } catch (err) { next(err); }
