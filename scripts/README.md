@@ -287,7 +287,7 @@ A: 健康评分仅供参考，基于您记录的数据进行计算。它不能�
 
 ## 技术支持
 
-如有问题或建议，请访问：https://github.com/huifer/Claude-Ally-Health
+如有问题或建议，请访问：https://github.com/kyunull/yinian-family-doctor
 
 ## 免责声明
 
@@ -295,6 +295,6 @@ A: 健康评分仅供参考，基于您记录的数据进行计算。它不能�
 
 ---
 
-**开发者**: WellAlly Tech
-**项目地址**: https://github.com/huifer/Claude-Ally-Health
+**开发者**: kyunull
+**项目地址**: https://github.com/kyunull/yinian-family-doctor
 **许可证**: MIT License

@@ -293,7 +293,7 @@ In the Claude-Ally-Health system, the following skills relate to knowledge base 
 If you find new relevant articles or have suggestions for improvements:
 
 1. Submit an Issue on GitHub
-2. Or contact the WellAlly team: huifer97@163.com
+2. Or contact the maintainer: dongyan1101@gmail.com
 
 ---
 

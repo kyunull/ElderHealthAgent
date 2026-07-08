@@ -587,8 +587,8 @@
 
 ## 联系方式
 
-- **项目维护**: WellAlly Tech
-- **GitHub**: https://github.com/huifer/Claude-Ally-Health
+- **项目维护**: kyunull
+- **GitHub**: https://github.com/kyunull/yinian-family-doctor
 - **问题反馈**: GitHub Issues
 - **功能讨论**: GitHub Discussions
 
