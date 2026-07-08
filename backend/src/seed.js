@@ -1,13 +1,18 @@
+import bcrypt from 'bcrypt';
 import { initDatabase, getDb } from './database.js';
 
 const db = getDb();
 initDatabase();
 
-// Find the first user
-const user = db.prepare('SELECT id FROM users LIMIT 1').get();
+// Find or create the first user
+let user = db.prepare('SELECT id FROM users LIMIT 1').get();
 if (!user) {
-  console.log('No users found. Please register a user first, then run: node --experimental-sqlite src/seed.js <user_id>');
-  process.exit(1);
+  const password_hash = bcrypt.hashSync('123456', 12);
+  const result = db.prepare(
+    'INSERT INTO users (username, password_hash, display_name) VALUES (?, ?, ?)'
+  ).run('admin', password_hash, '管理员');
+  user = { id: result.lastInsertRowid };
+  console.log('Created default user: admin / 123456');
 }
 
 const userId = process.argv[2] ? parseInt(process.argv[2]) : user.id;
