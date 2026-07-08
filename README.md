@@ -1,191 +1,146 @@
-# Claude-Ally-Health - Personal Health Information System
+# 🏥 Yinian Family Doctor
 
-[![English](https://img.shields.io/badge/lang-English-blue.svg)](README.md)
-[![中文](https://img.shields.io/badge/lang-中文-red.svg)](README.zh-CN.md)
+A comprehensive elderly health management web application. Features include health report management, medication tracking, CGA (Comprehensive Geriatric Assessment), cognitive screening, AI specialist consultations, and health trend analysis.
 
-[![GitHub stars](https://img.shields.io/github/stars/huifer/Claude-Ally-Health?style=social)](https://github.com/huifer/Claude-Ally-Health)
-[![GitHub forks](https://img.shields.io/github/forks/huifer/Claude-Ally-Health?style=social)](https://github.com/huifer/Claude-Ally-Health)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Star History Chart](https://api.star-history.com/svg?repos=huifer/Claude-Ally-Health&type=date&legend=top-left)](https://www.star-history.com/#huifer/Claude-Ally-Health&type=date&legend=top-left)
+## Tech Stack
 
-A file-based personal health data management system using Claude Code CLI tools for data management.
+| Layer | Technology |
+|-------|------------|
+| Frontend | Vue 3 + Element Plus + ECharts + Vue Router + Axios |
+| Backend | Express.js + SQLite (node:sqlite) |
+| Auth | JWT + bcrypt |
+| Build | Vite |
 
-**GitHub**: https://github.com/huifer/Claude-Ally-Health
+## Features
 
-> **⚠️ Disclaimer**: This project is NOT affiliated with, endorsed by, or associated with [Anthropic](https://www.anthropic.com/) or [Claude.ai](https://claude.ai/). This is an independent open-source project developed by [WellAlly Tech](https://www.wellally.tech/).
->
-> **📝 Note**: This project uses GLM's `mcp__4_5v_mcp__analyze_image` for image recognition.
+### 🏠 Dashboard
+Overview of health data summary with quick access to all modules.
 
-## Project Developer
+### 📋 Health Reports
+- Upload biochemical & imaging reports (JPG/PNG/PDF)
+- AI extraction of indicators and reference ranges
+- Abnormal value highlighting and trend tracking
+- Browse history by date and type
 
-This project is developed and maintained by [WellAlly Tech](https://www.wellally.tech/).
+### 💊 Medication Management
+- Drug name, dosage, frequency, schedule
+- Drug interaction detection (A/B/C/D/X severity levels)
+- Medication reminders (SMS/phone/app)
 
-## System Features
+### 🩺 AI Specialist Consultation
+- Single-specialty: Cardiology, Endocrinology, Gastroenterology, Nephrology, Neurology, Respiratory, Geriatrics, etc.
+- Multi-Disciplinary Team (MDT): parallel analysis + integrated summary
 
-- 📁 Pure file-based storage, no database required
-- 🖼️ Intelligent medical report image recognition
-- 📊 Automatic biochemical test data and reference range extraction
-- 🔍 Structured medical imaging data extraction
-- 🔪 Surgical history and implant management
-- 📋 Structured discharge summary storage
-- 👨‍⚕️ Multi-Disciplinary Team (MDT) consultation system
-- 🔬 13 medical specialist intelligent analysis
-- ☢️ Medical radiation dose tracking and management
-- 💊 **Intelligent drug interaction detection** (New)
-- 🚨 **Five-level severity warning system** (A/B/C/D/X)
-- 👤 User basic profile management
-- 💾 Local storage, completely private data
-- 🚀 Claude Code command operations, no programming required
+### 📈 Health Trends
+- Biochemical indicator trend charts (ECharts)
+- Time-series comparison and anomaly alerts
 
-## Directory Structure
+### 👴 CGA (Comprehensive Geriatric Assessment)
+- ADL / IADL functional assessment
+- Frailty Scale
+- Nutrition screening (MNA-SF)
+- Depression screening (GDS)
+- Fall risk assessment
+- Polypharmacy flag
+- Social support evaluation
+
+### 🧠 Cognitive Screening
+- MMSE / MoCA / Mini-Cog and more
+- Education-adjusted scoring
+- Informant questionnaire (AD8)
+- CDR (Clinical Dementia Rating)
+- Historical comparison and score change tracking
+- AI-assisted analysis and follow-up recommendations
+
+### 👤 Profile & ⚙️ Settings
+- Basic info, allergies, health indicators
+- System configuration, API key management
+
+## Project Structure
 
 ```
-my-his/
-├── .claude/
-│   ├── commands/
-│   │   ├── save-report.md    # Save medical report command
-│   │   ├── query.md          # Query records command
-│   │   ├── profile.md        # User profile settings command
-│   │   ├── radiation.md      # Radiation exposure management command
-│   │   ├── surgery.md        # Surgery history record command
-│   │   ├── discharge.md      # Discharge summary management command
-│   │   ├── medication.md     # Medication record management command
-│   │   ├── interaction.md    # Drug interaction detection command
-│   │   ├── consult.md        # Multi-disciplinary consultation command
-│   │   └── specialist.md     # Single specialist consultation command
-│   └── specialists/
-│       ├── cardiology.md            # Cardiology specialist Skill
-│       ├── endocrinology.md         # Endocrinology specialist Skill
-│       ├── gastroenterology.md      # Gastroenterology specialist Skill
-│       ├── nephrology.md            # Nephrology specialist Skill
-│       ├── hematology.md            # Hematology specialist Skill
-│       ├── respiratory.md           # Respiratory medicine specialist Skill
-│       ├── neurology.md             # Neurology specialist Skill
-│       ├── oncology.md              # Oncology specialist Skill
-│       ├── general.md               # General practice specialist Skill
-│       └── consultation-coordinator.md # Consultation coordinator
-├── data/
-│   ├── profile.json          # User basic profile
-│   ├── radiation-records.json # Radiation exposure records
-│   ├── allergies.json        # Allergy history records
-│   ├── interactions/         # Drug interaction database
-│   │   ├── interaction-db.json      # Interaction rules main database
-│   │   └── interaction-logs/        # Check history records
-│   ├── medications/          # Medication record data
-│   ├── 生化检查/             # Biochemical test data
-│   │   └── YYYY-MM/
-│   │       └── YYYY-MM-DD_test_name.json
-│   ├── 影像检查/             # Medical imaging data
-│   │   └── YYYY-MM/
-│   │       ├── YYYY-MM-DD_test_name_body_part.json
-│   │       └── images/       # Original image backup
-│   ├── 手术记录/             # Surgery history data
-│   │   └── YYYY-MM/
-│   │       └── YYYY-MM-DD_surgery_name.json
-│   ├── 出院小结/             # Discharge summary data
-│   │   └── YYYY-MM/
-│   │       └── YYYY-MM-DD_main_diagnosis.json
-│   └── index.json            # Global index file
-└── README.md
+yinian-family-doctor/
+├── backend/                    # Express.js API server
+│   └── src/
+│       ├── server.js           # Entry point + routes
+│       ├── database.js         # SQLite schema + migrations
+│       ├── seed.js             # Seed data
+│       ├── middleware/         # auth, error-handler
+│       ├── routes/             # auth, reports, medications,
+│       │                       # consultations, trends, cga,
+│       │                       # cognitive, profile, settings,
+│       │                       # reminders, asr
+│       ├── services/           # AI data extraction
+│       └── repositories/       # Data access layer
+├── frontend/                   # Vue 3 SPA
+│   └── src/
+│       ├── router/index.js     # Routes + navigation guards
+│       ├── api/index.js        # Axios + API layer
+│       ├── views/              # Page components
+│       └── components/         # Shared components
+├── data/                       # SQLite DB + uploads (runtime)
+├── .claude/                    # Claude Code commands/skills/specialists
+├── docs/                       # Documentation
+└── scripts/                    # Utility scripts
 ```
-
-## Quick Navigation
-
-- 📖 [Complete User Guide](docs/user-guide.md) (Chinese) | [docs/user-guide.en.md](docs/user-guide.en.md) (English) - Detailed command usage instructions and examples
-- 📋 [Data Structure Specification](docs/data-structures.md) (Chinese) | [docs/data-structures.en.md](docs/data-structures.en.md) (English) - JSON data format and field descriptions
-- 🔧 [Technical Implementation Details](docs/technical-details.md) (Chinese) - System architecture and technical details
-- ⚠️ [Safety Guidelines and Usage Limitations](docs/safety-guidelines.md) (Chinese) - Safety principles and disclaimer
 
 ## Quick Start
 
-1. Ensure Claude Code is installed
-2. Open Claude Code in the current directory
-3. First-time setup: `/profile set 175 70 1990-01-01`
-4. Save first report: `/save-report /path/to/image.jpg`
-5. Record radiation: `/radiation add CT chest`
-6. Record surgery: `/surgery Gallbladder removal surgery in August last year due to gallstones`
-7. Save discharge summary: `/discharge @医疗报告/出院小结.jpg`
-8. Query all records: `/query all`
-9. Start MDT consultation: `/consult`
+### Prerequisites
+- Node.js >= 18.0.0
 
-## Data Privacy
-
-- All data stored on local filesystem
-- No uploads to any cloud services
-- No external database dependencies
-- Completely private management
-
-## Core Commands Overview
-
-| Command | Function | Description |
-|---------|----------|-------------|
-| `/profile` | User basic parameters | Set height, weight, birth date |
-| `/save-report` | Save medical report | Support biochemical and imaging tests |
-| `/radiation` | Radiation management | Record and track radiation exposure |
-| `/surgery` | Surgery history | Record surgery information and implants |
-| `/discharge` | Discharge summary | Save and structure discharge summaries |
-| `/medication` | Medication management | Manage medication plans and records |
-| `/interaction` | Interaction detection | Detect drug interactions |
-| `/allergy` | Allergy history management | Record and manage allergy history |
-| `/query` | Query records | Multi-condition medical data queries |
-| `/consult` | Multi-disciplinary consultation | Comprehensive analysis across 13 specialties |
-| `/specialist` | Single specialist consultation | Consult specific specialty experts |
-
-> 💡 For detailed usage, refer to [Complete User Guide](docs/user-guide.en.md)
-
-## Technical Features
-
-- **Storage Method**: JSON files + filesystem directory structure
-- **Command System**: Claude Code Slash Commands
-- **Expert System**: Multi-specialty Skill definitions + Subagent architecture
-- **Consultation Coordination**: Parallel processing + opinion integration algorithms
-- **Image Recognition**: AI visual analysis
-- **Data Extraction**: Intelligent text recognition and structuring
-- **Radiation Calculation**: Body surface area adjustment + exponential decay model
-
-> 🔧 For more technical details, refer to [Technical Implementation Details](docs/technical-details.md) (Chinese)
-
-## ⚠️ Important Safety Statement
-
-This system strictly follows medical safety principles:
-
-1. **Does not provide specific medication dosages**
-2. **Does not directly prescribe prescription drugs**
-3. **Does not predict life prognosis**
-4. **Does not replace doctor diagnosis**
-
-All analysis reports from this system are for reference only and should not be used as a basis for medical diagnosis. All medical decisions require consultation with professional doctors. In case of emergency, seek immediate medical attention.
-
-> ⚠️ For complete safety principles and usage limitations, refer to [Safety Guidelines Document](docs/safety-guidelines.md) (Chinese)
-
-## 💊 Drug Interaction Database
-
-The system includes intelligent drug interaction detection, supporting drug-drug, drug-disease, drug-dose, and drug-food interaction detection using a five-level severity classification system (A/B/C/D/X).
-
-**Core Features:**
-- 🔍 Automatically detect interactions in current medication combinations
-- 🚨 Severity-graded warnings (A/B/C/D/X)
-- 📋 Provide detailed management recommendations and monitoring indicators
-- 💾 Support custom rules and history records
-
-**Quick Start:**
+### Start Backend
 ```bash
-# Check interactions for current medications
-/interaction check
-
-# List all interaction rules
-/interaction list
-
-# View absolute contraindication rules
-/interaction list X
+cd backend
+npm install
+npm run dev        # http://localhost:3000
 ```
 
-> 📖 **Detailed Documentation**: [Drug Interaction Database Complete Guide](docs/drug-interaction-database.md) (Chinese)
->
-> 🩺 **Professional Contributions**: Medical professionals are welcome to help improve the database → [Contribution Guidelines](docs/drug-interaction-database.md#专业人员贡献指南-) (Chinese)
+### Start Frontend
+```bash
+cd frontend
+npm install
+npm run dev        # http://localhost:5173
+```
+
+### Seed Data (optional)
+```bash
+cd backend
+npm run seed
+```
+
+## API Overview
+
+| Endpoint | Method | Description | Auth |
+|----------|--------|-------------|------|
+| `/api/auth/register` | POST | Register | — |
+| `/api/auth/login` | POST | Login, returns JWT | — |
+| `/api/reports/upload` | POST | Upload health report | JWT |
+| `/api/reports` | GET | List reports | JWT |
+| `/api/reports/:id` | GET | Report detail | JWT |
+| `/api/medications` | GET/POST | List/add medications | JWT |
+| `/api/medications/:id` | PUT/DELETE | Edit/stop medication | JWT |
+| `/api/consultations` | POST | Start AI consultation | JWT |
+| `/api/trends` | GET | Indicator trend data | JWT |
+| `/api/cga-assessments` | GET/POST | CGA list/create | JWT |
+| `/api/cognitive-screenings` | GET/POST | Screening list/create | JWT |
+| `/api/profile` | GET/PUT | View/update profile | JWT |
+| `/api/settings` | GET | System settings | JWT |
+| `/api/reminders` | GET/POST | Reminder list/create | JWT |
+
+## Safety Disclaimer
+
+> ⚠️ **Disclaimer**: All AI analysis results are for reference only and do not constitute medical diagnosis. Consult healthcare professionals for all medical decisions. In case of emergency, seek immediate medical attention.
+
+- Passwords hashed with bcrypt (12 rounds)
+- JWT-based API authentication
+- Local SQLite data storage
+- UUID-based file naming to prevent path guessing
 
 ## License
 
-This project is open-sourced under the [MIT License](LICENSE).
+[MIT](LICENSE)
 
-**Important Disclaimer**: This system is for personal health management only and should not be used as a basis for medical diagnosis.
+---
+
+**Maintainer**: [kyunull](https://github.com/kyunull)

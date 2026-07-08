@@ -1,190 +1,152 @@
-# 个人医疗数据中心 (Personal Health Information System)
+# 🏥 颐年家庭医生
 
-[![English](https://img.shields.io/badge/lang-English-blue.svg)](README.md)
-[![中文](https://img.shields.io/badge/lang-中文-red.svg)](README.zh-CN.md)
+面向老年人的综合健康管理系统（Web 应用）。支持健康报告管理、用药追踪、CGA 老年综合评估、认知筛查、AI 专家会诊、健康趋势分析等功能。
 
-[![GitHub stars](https://img.shields.io/github/stars/huifer/Claude-Ally-Health?style=social)](https://github.com/huifer/Claude-Ally-Health)
-[![GitHub forks](https://img.shields.io/github/forks/huifer/Claude-Ally-Health?style=social)](https://github.com/huifer/Claude-Ally-Health)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Star History Chart](https://api.star-history.com/svg?repos=huifer/Claude-Ally-Health&type=date&legend=top-left)](https://www.star-history.com/#huifer/Claude-Ally-Health&type=date&legend=top-left)
+## 技术栈
 
-基于文件系统的个人医疗健康数据管理系统，使用 Claude Code 命令行工具进行数据管理。
+| 层级 | 技术 |
+|------|------|
+| 前端 | Vue 3 + Element Plus + ECharts + Vue Router + Axios |
+| 后端 | Express.js + SQLite (node:sqlite) |
+| 认证 | JWT + bcrypt |
+| 构建 | Vite |
 
-**GitHub**: https://github.com/huifer/Claude-Ally-Health
+## 功能概览
 
-> **⚠️ 免责声明**: 本项目与 [Anthropic](https://www.anthropic.com/) 或 [Claude.ai](https://claude.ai/) **没有任何关联、背书或从属关系**。本项目是由 [WellAlly Tech](https://www.wellally.tech/) 独立开发的独立开源项目。
->
-> **📝 Note**: 项目使用到 GLM 提供的 mcp__4_5v_mcp__analyze_image 。
-## 项目开发方
+### 🏠 首页仪表盘
+登录后展示用户健康数据摘要和快捷入口。
 
-本项目由 [WellAlly Tech](https://www.wellally.tech/) 开发和维护。
+### 📋 健康报告管理
+- 上传生化/影像检查单（JPG/PNG/PDF）
+- AI 自动提取检查指标和参考范围
+- 异常指标标注和趋势追踪
+- 按日期、类型浏览历史报告
 
-## 系统特点
+### 💊 用药管理
+- 药品名称、剂量、频率、时间安排
+- 药物相互作用检测（A/B/C/D/X 五级严重程度）
+- 用药提醒（短信/电话/App）
 
-- 📁 纯文件系统存储，无需数据库
-- 🖼️ 支持医疗检查单图片智能识别
-- 📊 自动提取生化检查指标和参考范围
-- 🔍 支持影像检查结构化数据提取
-- 🔪 手术历史记录和植入物管理
-- 📋 出院小结结构化存储
-- 👨‍⚕️ 多学科专家会诊系统（MDT）
-- 🔬 9大专科智能分析
-- ☢️ 医学辐射剂量追踪和管理
-- 💊 **药物相互作用智能检测**（新增）
-- 🚨 **五级严重程度预警系统**（A/B/C/D/X）
-- 👤 用户基础档案管理
-- 💾 本地存储，数据完全私有
-- 🚀 使用 Claude Code 命令操作，无需编程
+### 🩺 AI 专家分析
+- 单专科咨询：心内、内分泌、消化、肾内、神经、呼吸、老年科等
+- 多学科会诊（MDT）：并行分析 + 综合意见
+
+### 📈 健康趋势
+- 生化指标趋势图（ECharts 可视化）
+- 时间维度对比和异常预警
+
+### 👴 老年综合评估（CGA）
+- ADL / IADL 日常生活能力评估
+- 衰弱评估（Frailty Scale）
+- 营养评估（MNA-SF）
+- 抑郁筛查（GDS）
+- 跌倒风险评估
+- 多重用药标记
+- 社会支持评估
+
+### 🧠 认知筛查
+- MMSE / MoCA / Mini-Cog 等多种工具
+- 教育程度校正
+- 知情者问卷（AD8）
+- CDR 临床痴呆评定量表
+- 历史筛查对比与变化追踪
+- AI 辅助分析及随访建议
+
+### 👤 个人档案 & ⚙️ 设置
+- 基本信息、过敏史、健康指标管理
+- 系统配置、API Key 管理
 
 ## 目录结构
 
 ```
-my-his/
-├── .claude/
-│   ├── commands/
-│   │   ├── save-report.md    # 保存检查单命令
-│   │   ├── query.md          # 查询记录命令
-│   │   ├── profile.md        # 用户基础参数设置命令
-│   │   ├── radiation.md      # 辐射暴露管理命令
-│   │   ├── surgery.md        # 手术历史记录命令
-│   │   ├── discharge.md      # 出院小结管理命令
-│   │   ├── medication.md     # 用药记录管理命令
-│   │   ├── interaction.md    # 药物相互作用检测命令
-│   │   ├── consult.md        # 多学科专家会诊命令
-│   │   └── specialist.md     # 单专科咨询命令
-│   └── specialists/
-│       ├── cardiology.md            # 心内科专家 Skill
-│       ├── endocrinology.md         # 内分泌科专家 Skill
-│       ├── gastroenterology.md      # 消化科专家 Skill
-│       ├── nephrology.md            # 肾内科专家 Skill
-│       ├── hematology.md            # 血液科专家 Skill
-│       ├── respiratory.md           # 呼吸科专家 Skill
-│       ├── neurology.md             # 神经内科专家 Skill
-│       ├── oncology.md              # 肿瘤科专家 Skill
-│       ├── general.md               # 全科专家 Skill
-│       └── consultation-coordinator.md # 会诊协调器
-├── data/
-│   ├── profile.json          # 用户基础档案
-│   ├── radiation-records.json # 辐射暴露记录
-│   ├── allergies.json        # 过敏史记录
-│   ├── interactions/         # 药物相互作用数据库
-│   │   ├── interaction-db.json      # 相互作用规则主数据库
-│   │   └── interaction-logs/        # 检查历史记录
-│   ├── medications/          # 用药记录数据
-│   ├── 生化检查/             # 生化检验数据
-│   │   └── YYYY-MM/
-│   │       └── YYYY-MM-DD_检查项目.json
-│   ├── 影像检查/             # 影像检查数据
-│   │   └── YYYY-MM/
-│   │       ├── YYYY-MM-DD_检查项目_部位.json
-│   │       └── images/       # 原始图片备份
-│   ├── 手术记录/             # 手术历史数据
-│   │   └── YYYY-MM/
-│   │       └── YYYY-MM-DD_手术名称.json
-│   ├── 出院小结/             # 出院小结数据
-│   │   └── YYYY-MM/
-│   │       └── YYYY-MM-DD_主要诊断.json
-│   └── index.json            # 全局索引文件
-└── README.md
+yinian-family-doctor/
+├── backend/                    # Express.js 后端
+│   └── src/
+│       ├── server.js           # 应用入口 + 路由
+│       ├── database.js         # SQLite 表结构 + 迁移
+│       ├── seed.js             # 种子数据
+│       ├── middleware/         # auth、error-handler
+│       ├── routes/             # auth、reports、medications、
+│       │                       # consultations、trends、cga、
+│       │                       # cognitive、profile、settings、
+│       │                       # reminders、asr
+│       ├── services/           # AI 数据提取
+│       └── repositories/       # 数据访问层
+├── frontend/                   # Vue 3 前端
+│   └── src/
+│       ├── router/index.js     # 路由 + 导航守卫
+│       ├── api/index.js        # Axios 封装 + API
+│       ├── views/              # Login、Register、Layout、
+│       │                       # Dashboard、Reports、ReportUpload、
+│       │                       # ReportDetail、Medications、
+│       │                       # Consultation、Trends、
+│       │                       # CGAAssessment、CognitiveScreening、
+│       │                       # Profile、Settings
+│       └── components/         # VoiceInput 等
+├── data/                       # SQLite 数据库 + 上传文件
+├── .claude/                    # Claude Code 命令/Skills/专家
+├── docs/                       # 项目文档
+├── scripts/                    # 辅助脚本
+└── package.json
 ```
-
-## 快速导航
-
-- 📖 [完整使用指南](docs/user-guide.md) - 详细的命令使用说明和示例
-- 📋 [数据结构说明](docs/data-structures.md) - JSON 数据格式和字段说明
-- 🔧 [技术实现细节](docs/technical-details.md) - 系统架构和技术细节
-- ⚠️ [安全原则和使用限制](docs/safety-guidelines.md) - 使用安全原则和免责声明
 
 ## 快速开始
 
-1. 确保已安装 Claude Code
-2. 在当前目录打开 Claude Code
-3. 首次使用先设置基础参数：`/profile set 175 70 1990-01-01`
-4. 使用 `/save-report /path/to/image.jpg` 保存第一张检查单
-5. 使用 `/radiation add CT 胸部` 记录辐射检查
-6. 使用 `/surgery 去年8月做了胆囊切除手术，因为胆囊结石` 记录手术历史
-7. 使用 `/discharge @医疗报告/出院小结.jpg` 保存出院小结
-8. 使用 `/query all` 查看所有记录
-9. 使用 `/consult` 启动多学科专家会诊
+### 环境要求
+- Node.js >= 18.0.0
 
-## 数据隐私
-
-- 所有数据存储在本地文件系统
-- 不上传到任何云端服务
-- 不依赖外部数据库
-- 完全私有化管理
-
-## 核心命令一览
-
-| 命令 | 功能 | 说明 |
-|------|------|------|
-| `/profile` | 用户基础参数 | 设置身高、体重、出生日期 |
-| `/save-report` | 保存检查单 | 支持生化和影像检查 |
-| `/radiation` | 辐射管理 | 记录和追踪辐射暴露 |
-| `/surgery` | 手术历史 | 记录手术信息和植入物 |
-| `/discharge` | 出院小结 | 保存和结构化出院小结 |
-| `/medication` | 用药管理 | 管理用药计划和记录 |
-| `/interaction` | 相互作用检测 | 检测药物相互作用 |
-| `/allergy` | 过敏史管理 | 记录和管理过敏史 |
-| `/query` | 查询记录 | 多条件查询医疗数据 |
-| `/consult` | 多学科会诊 | 9大专科综合分析 |
-| `/specialist` | 单专科咨询 | 咨询特定专科专家 |
-
-> 💡 详细使用方法请参考 [完整使用指南](docs/user-guide.md)
-
-## 技术特点
-
-- **存储方式**: JSON 文件 + 文件系统目录结构
-- **命令系统**: Claude Code Slash Commands
-- **专家系统**: 多专科 Skill 定义 + Subagent 架构
-- **会诊协调**: 并行处理 + 意见整合算法
-- **图片识别**: AI 视觉分析
-- **数据提取**: 智能文字识别与结构化
-- **辐射计算**: 体表面积调整 + 指数衰减模型
-
-> 🔧 更多技术细节请参考 [技术实现细节](docs/technical-details.md)
-
-## ⚠️ 重要安全声明
-
-本系统严格遵守医疗安全原则：
-
-1. **不给出具体用药剂量**
-2. **不直接开具处方药名**
-3. **不判断生死预后**
-4. **不替代医生诊断**
-
-本系统所有分析报告仅供参考，不作为医疗诊断依据。所有诊疗决策需咨询专业医生。如有紧急情况，请立即就医。
-
-> ⚠️ 完整的安全原则和使用限制请参考 [安全原则文档](docs/safety-guidelines.md)
-
-## 💊 药物相互作用数据库
-
-系统内置药物相互作用智能检测功能，支持药物-药物、药物-疾病、药物剂量、药物-食物四种类型的相互作用检测，采用五级严重程度分级系统（A/B/C/D/X）。
-
-**核心功能：**
-- 🔍 自动检测当前用药组合的相互作用
-- 🚨 按严重程度分级预警（A/B/C/D/X）
-- 📋 提供详细的管理建议和监测指标
-- 💾 支持自定义规则和历史记录
-
-**快速使用：**
+### 启动后端
 ```bash
-# 检查当前用药的相互作用
-/interaction check
-
-# 列出所有相互作用规则
-/interaction list
-
-# 查看绝对禁忌规则
-/interaction list X
+cd backend
+npm install
+npm run dev        # http://localhost:3000
 ```
 
-> 📖 **详细文档**: [药物相互作用数据库完整说明](docs/drug-interaction-database.md)
->
-> 🩺 **专业人员贡献**: 欢迎医疗专家帮助完善数据库 → [贡献指南](docs/drug-interaction-database.md#专业人员贡献指南-)
+### 启动前端
+```bash
+cd frontend
+npm install
+npm run dev        # http://localhost:5173
+```
 
-## 许可证
+### 初始化种子数据（可选）
+```bash
+cd backend
+npm run seed
+```
 
-本项目采用 [MIT License](LICENSE) 开源许可证。
+## API 概览
 
-**重要声明**: 本系统仅供个人健康管理使用，不作为医疗诊断依据。
+| 路径 | 方法 | 说明 | 认证 |
+|------|------|------|------|
+| `/api/auth/register` | POST | 用户注册 | — |
+| `/api/auth/login` | POST | 用户登录，返回 JWT | — |
+| `/api/reports/upload` | POST | 上传健康检查单 | JWT |
+| `/api/reports` | GET | 查询报告列表 | JWT |
+| `/api/reports/:id` | GET | 查看报告详情 | JWT |
+| `/api/medications` | GET/POST | 用药列表/添加 | JWT |
+| `/api/medications/:id` | PUT/DELETE | 编辑/停用用药 | JWT |
+| `/api/consultations` | POST | 发起专家会诊 | JWT |
+| `/api/trends` | GET | 指标趋势数据 | JWT |
+| `/api/cga-assessments` | GET/POST | CGA 评估列表/新建 | JWT |
+| `/api/cognitive-screenings` | GET/POST | 认知筛查列表/新建 | JWT |
+| `/api/profile` | GET/PUT | 查看/更新个人档案 | JWT |
+| `/api/settings` | GET | 系统配置 | JWT |
+| `/api/reminders` | GET/POST | 用药提醒列表/新建 | JWT |
+
+## 安全声明
+
+> ⚠️ **免责声明**：本系统所有 AI 分析结果仅供参考，不作为医疗诊断依据。所有诊疗决策请咨询专业医生。如有紧急情况，请立即就医。
+
+- 用户密码使用 bcrypt（12轮）哈希存储
+- API 使用 JWT Token 认证
+- 数据存储在本地 SQLite 数据库
+- 上传文件使用 UUID 命名，防止路径猜测
+
+## License
+
+[MIT](LICENSE)
+
+---
+
+**维护者**: [kyunull](https://github.com/kyunull)

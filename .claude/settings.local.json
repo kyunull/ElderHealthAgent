@@ -1,41 +1,20 @@
 {
   "permissions": {
     "allow": [
-      "Bash(xcopy:*)",
-      "Bash(robocopy:*)",
-      "Bash(powershell:*)",
-      "Bash(dir:*)",
       "Bash(npm install:*)",
+      "Bash(npm run:*)",
       "Bash(npm test:*)",
-      "Bash(node -c:*)",
-      "Bash(awk:*)",
-      "Bash(cat:*)",
       "Bash(node:*)",
-      "Bash(for:*)",
-      "Bash(do echo:*)",
-      "Bash(done)",
-      "Bash(perl:*)",
-      "Bash(npm run test:*)",
-      "Bash(chmod:*)",
-      "Bash(/Users/zhangsan/Claude-Ally-Health/scripts/test.sh)",
-      "Bash(echo:*)",
-      "Bash(/Users/zhangsan/Claude-Ally-Health/scripts/test-mens-health.sh)",
-      "Bash(./scripts/test-children-health.sh:*)",
-      "Bash(/Users/zhangsan/Claude-Ally-Health/scripts/test-elderly-health.sh:*)",
-      "Bash(/Users/zhangsan/Claude-Ally-Health/scripts/test-chronic-diseases.sh:*)",
-      "Bash(./scripts/test-fitness.sh:*)",
-      "Bash(bash:*)",
-      "Bash(test:*)",
+      "Bash(git:*)",
       "Bash(ls:*)",
-      "Bash(/Users/zhangsan/Claude-Ally-Health/scripts/test-rehabilitation.sh)",
-      "Bash(/Users/zhangsan/Claude-Ally-Health/scripts/test-family-health.sh:*)",
-      "Bash(./scripts/test-ai-features.sh:*)",
-      "Bash(python3:*)"
+      "Bash(echo:*)",
+      "Bash(mkdir:*)",
+      "Bash(rm:*)",
+      "Bash(cat:*)",
+      "Bash(dir:*)",
+      "Bash(powershell:*)",
+      "Bash(bash:*)"
     ]
   },
-  "enabledMcpjsonServers": [
-    "claude-flow",
-    "ruv-swarm"
-  ],
   "enableAllProjectMcpServers": true
 }
