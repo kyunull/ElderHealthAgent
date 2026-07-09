@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getDb } from '../database.js';
 import { AppError } from '../middleware/error-handler.js';
 import { searchKnowledgeBase } from '../services/knowledge-base.js';
+import { callAnthropicTextLLM } from '../services/ai-extraction.js';
 
 const router = Router();
 
@@ -98,16 +99,6 @@ router.post('/:id/follow-up', async (req, res, next) => {
 
 // Real AI API call for follow-up Q&A
 async function callAIForFollowUp(consultation, question, history, knowledgeEntries, userId) {
-  const db = getDb();
-  const user = db.prepare('SELECT api_key_encrypted FROM users WHERE id = ?').get(userId);
-  if (!user?.api_key_encrypted) throw new Error('未配置 AI API Key');
-
-  const apiKey = Buffer.from(user.api_key_encrypted, 'base64').toString('utf-8');
-  const modelCfg = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'anthropic_model'").get();
-  const baseUrlCfg = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'anthropic_base_url'").get();
-  const model = modelCfg?.config_value || 'claude-sonnet-5';
-  const baseUrl = baseUrlCfg?.config_value || 'https://api.anthropic.com';
-
   const specialtyLabel = consultation.mdt_specialties
     ? JSON.parse(consultation.mdt_specialties).map(s => SPECIALTY_NAMES[s] || s).join('、')
     : (SPECIALTY_NAMES[consultation.specialty] || consultation.specialty);
@@ -156,45 +147,11 @@ ${question}
 - 最后自然追问（如需要）
 - 如需进一步诊疗，温和建议去医院挂${specialtyLabel.split('、')[0]}`;
 
-  const resp = await fetch(`${baseUrl}/v1/messages`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 2048,
-      messages: [{ role: 'user', content: prompt }]
-    })
-  });
-
-  if (!resp.ok) {
-    const errText = await resp.text().catch(() => '');
-    throw new Error(`AI API error ${resp.status}: ${errText.slice(0, 200)}`);
-  }
-
-  const result = await resp.json();
-  return result.content?.find(c => c.type === 'text')?.text
-    || result.content?.[0]?.text
-    || result.choices?.[0]?.message?.content || '';
+  return await callAnthropicTextLLM(prompt, userId);
 }
 
 // Real AI API call for consultation analysis
 async function callAIForConsultation(consultation, specialtyLabel, userId) {
-  const db = getDb();
-  const user = db.prepare('SELECT api_key_encrypted FROM users WHERE id = ?').get(userId);
-  if (!user?.api_key_encrypted) {
-    throw new Error('未配置 AI API Key');
-  }
-
-  const apiKey = Buffer.from(user.api_key_encrypted, 'base64').toString('utf-8');
-  const modelCfg = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'anthropic_model'").get();
-  const baseUrlCfg = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'anthropic_base_url'").get();
-  const model = modelCfg?.config_value || 'claude-sonnet-5';
-  const baseUrl = baseUrlCfg?.config_value || 'https://api.anthropic.com';
-
   const consultType = consultation.consultation_type === 'mdt' ? 'MDT 多学科会诊' : '单专科咨询';
   const knowledgeEntries = searchKnowledgeBase(consultation.chief_complaint);
 
@@ -246,30 +203,7 @@ ${knowledgeContext}
 ⚠️ 重要提醒
 郑重提醒：本分析由AI生成，仅供参考，不能替代医生诊断。如有紧急情况（剧烈胸痛、呼吸困难、意识改变等），请立即拨打120。`;
 
-  const resp = await fetch(`${baseUrl}/v1/messages`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 4096,
-      messages: [{ role: 'user', content: prompt }]
-    })
-  });
-
-  if (!resp.ok) {
-    const errText = await resp.text().catch(() => '');
-    throw new Error(`AI API error ${resp.status}: ${errText.slice(0, 200)}`);
-  }
-
-  const result = await resp.json();
-  const content = result.content?.find(c => c.type === 'text')?.text
-    || result.content?.[0]?.text
-    || result.choices?.[0]?.message?.content || '';
-  return content;
+  return await callAnthropicTextLLM(prompt, userId);
 }
 
 // Fallback analysis when AI is unavailable

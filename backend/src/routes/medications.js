@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getDb } from '../database.js';
 import { AppError } from '../middleware/error-handler.js';
+import { callVisionAPI } from '../services/ai-extraction.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -281,18 +282,6 @@ router.post('/ocr-recognize', upload.single('image'), async (req, res, next) => 
   try {
     if (!req.file) throw AppError.validation({ image: '请上传药瓶或药品说明书照片' });
 
-    const db = getDb();
-    const user = db.prepare('SELECT api_key_encrypted FROM users WHERE id = ?').get(req.user.id);
-    if (!user?.api_key_encrypted) {
-      throw new Error('未配置 AI API Key，请在设置中配置后使用拍照识别功能');
-    }
-
-    const apiKey = Buffer.from(user.api_key_encrypted, 'base64').toString('utf-8');
-    const modelCfg = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'anthropic_model'").get();
-    const baseUrlCfg = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'anthropic_base_url'").get();
-    const model = modelCfg?.config_value || 'claude-sonnet-5';
-    const baseUrl = baseUrlCfg?.config_value || 'https://api.anthropic.com';
-
     const base64Image = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype;
 
@@ -317,35 +306,7 @@ router.post('/ocr-recognize', upload.single('image'), async (req, res, next) => 
 - 如果文字模糊不清，把confidence设为low并在相应字段如实反映
 - 只返回JSON，不要加其他文字`;
 
-    const resp = await fetch(`${baseUrl}/v1/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 2048,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64Image } },
-            { type: 'text', text: prompt }
-          ]
-        }]
-      })
-    });
-
-    if (!resp.ok) {
-      const errText = await resp.text().catch(() => '');
-      throw new Error(`AI API error ${resp.status}: ${errText.slice(0, 200)}`);
-    }
-
-    const result = await resp.json();
-    const textContent = result.content?.find(c => c.type === 'text')?.text
-      || result.content?.[0]?.text
-      || result.choices?.[0]?.message?.content || '';
+    const textContent = await callVisionAPI(base64Image, mimeType, prompt, req.user.id);
 
     // Extract JSON from response
     let drugInfo;

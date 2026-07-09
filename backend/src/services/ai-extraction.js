@@ -264,6 +264,168 @@ async function structureOCRText(rawText, reportType, apiKey, baseUrl, model, pro
   return rawText;
 }
 
+// ── Text-only API calls ──
+
+async function callAnthropicText(prompt, apiKey, baseUrl, model) {
+  const url = `${baseUrl}/v1/messages`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: model || 'claude-sonnet-5',
+      max_tokens: 4096,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`AI API error ${resp.status}: ${errText.slice(0, 200)}`);
+  }
+  const result = await resp.json();
+  return result.content?.find(c => c.type === 'text')?.text
+    || result.content?.[0]?.text
+    || result.choices?.[0]?.message?.content || '';
+}
+
+async function callGLMText(prompt, apiKey, baseUrl, model) {
+  const url = baseUrl || 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: model || 'glm-4-flash',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 4096
+    })
+  });
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`AI API error ${resp.status}: ${errText.slice(0, 200)}`);
+  }
+  const result = await resp.json();
+  return result.choices?.[0]?.message?.content || '';
+}
+
+async function callOpenAIText(prompt, apiKey, baseUrl, model) {
+  const url = `${baseUrl || 'https://api.openai.com'}/v1/chat/completions`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: model || 'gpt-4o',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 4096
+    })
+  });
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`AI API error ${resp.status}: ${errText.slice(0, 200)}`);
+  }
+  const result = await resp.json();
+  return result.choices?.[0]?.message?.content || '';
+}
+
+// ── Multi-provider text LLM dispatcher ──
+
+export async function callTextLLM(prompt, userId) {
+  const db = getDb();
+  const ocrProvider = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'ocr_provider'").get();
+  const provider = ocrProvider?.config_value || 'anthropic';
+
+  if (provider === 'anthropic') {
+    const user = db.prepare('SELECT api_key_encrypted FROM users WHERE id = ?').get(userId);
+    if (!user?.api_key_encrypted) throw new Error('未配置 AI API Key');
+    const apiKey = Buffer.from(user.api_key_encrypted, 'base64').toString('utf-8');
+    const modelCfg = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'anthropic_model'").get();
+    const baseUrlCfg = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'anthropic_base_url'").get();
+    return await callAnthropicText(prompt, apiKey,
+      baseUrlCfg?.config_value || 'https://api.anthropic.com',
+      modelCfg?.config_value || 'claude-sonnet-5');
+  }
+
+  const ocrKey = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'ocr_api_key'").get();
+  if (!ocrKey?.config_value) throw new Error(`未配置 ${provider} API Key`);
+  const apiKey = Buffer.from(ocrKey.config_value, 'base64').toString('utf-8');
+  const ocrUrl = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'ocr_api_url'").get();
+  const ocrModel = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'ocr_model'").get();
+
+  switch (provider) {
+    case 'openai':
+      return await callOpenAIText(prompt, apiKey, ocrUrl?.config_value || '', ocrModel?.config_value || '');
+    case 'glm':
+    case 'custom':
+    default:
+      return await callGLMText(prompt, apiKey, ocrUrl?.config_value || '', ocrModel?.config_value || '');
+  }
+}
+
+// Always use Anthropic for text LLM (consultations, etc.)
+export async function callAnthropicTextLLM(prompt, userId) {
+  const db = getDb();
+  const user = db.prepare('SELECT api_key_encrypted FROM users WHERE id = ?').get(userId);
+  if (!user?.api_key_encrypted) throw new Error('未配置 AI API Key，请在设置页面配置');
+  const apiKey = Buffer.from(user.api_key_encrypted, 'base64').toString('utf-8');
+  const modelCfg = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'anthropic_model'").get();
+  const baseUrlCfg = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'anthropic_base_url'").get();
+  return await callAnthropicText(prompt, apiKey,
+    baseUrlCfg?.config_value || 'https://api.anthropic.com',
+    modelCfg?.config_value || 'claude-sonnet-5');
+}
+
+export async function callVisionAPI(base64Image, mimeType, prompt, userId) {
+  const db = getDb();
+  const ocrProvider = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'ocr_provider'").get();
+  const provider = ocrProvider?.config_value || 'anthropic';
+
+  if (provider === 'anthropic') {
+    const user = db.prepare('SELECT api_key_encrypted FROM users WHERE id = ?').get(userId);
+    if (!user?.api_key_encrypted) {
+      throw new Error('未配置 AI API Key，请在设置页面配置');
+    }
+    const apiKey = Buffer.from(user.api_key_encrypted, 'base64').toString('utf-8');
+    const modelCfg = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'anthropic_model'").get();
+    const baseUrlCfg = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'anthropic_base_url'").get();
+    const model = modelCfg?.config_value || 'claude-sonnet-5';
+    const baseUrl = baseUrlCfg?.config_value || 'https://api.anthropic.com';
+    return await callAnthropicAPI(base64Image, mimeType, prompt, apiKey, baseUrl, model);
+  }
+
+  const ocrKey = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'ocr_api_key'").get();
+  const ocrUrl = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'ocr_api_url'").get();
+  const ocrModel = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'ocr_model'").get();
+
+  if (!ocrKey?.config_value) {
+    throw new Error(`OCR 提供商 "${provider}" 缺少 API Key，请在设置页面配置`);
+  }
+
+  const apiKey = Buffer.from(ocrKey.config_value, 'base64').toString('utf-8');
+  const apiUrl = ocrUrl?.config_value || '';
+  const model = ocrModel?.config_value || '';
+
+  switch (provider) {
+    case 'openai':
+      return await callOpenAIAPI(base64Image, mimeType, prompt, apiKey, apiUrl, model);
+    case 'baidu': {
+      const rawText = await callBaiduOCRAPI(base64Image, prompt, apiKey, apiUrl, model);
+      return await structureOCRText(rawText, '', apiKey, apiUrl, model, provider);
+    }
+    case 'glm':
+    case 'custom':
+    default:
+      return await callGLMAPI(base64Image, mimeType, prompt, apiKey, apiUrl, model);
+  }
+}
+
 // ── Main extraction function ──
 
 export async function performAIExtraction(imagePath, reportType, reportId, userId) {
@@ -282,61 +444,10 @@ export async function performAIExtraction(imagePath, reportType, reportId, userI
 
     db.prepare("UPDATE health_reports SET status = 'ai_processing' WHERE id = ?").run(reportId);
 
-    // Determine which provider to use
-    const ocrProvider = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'ocr_provider'").get();
-    const provider = ocrProvider?.config_value || 'anthropic';
+    const prompt = buildExtractionPrompt(reportType);
+    const rawContent = await callVisionAPI(base64Image, mimeType, prompt, userId);
 
-    let rawContent;
-
-    if (provider === 'anthropic') {
-      // Use main Anthropic API config
-      const user = db.prepare('SELECT api_key_encrypted FROM users WHERE id = ?').get(userId);
-      if (!user?.api_key_encrypted) {
-        throw new Error('未配置 API Key，请在设置页面配置 AI API Key');
-      }
-      const apiKey = Buffer.from(user.api_key_encrypted, 'base64').toString('utf-8');
-      const modelCfg = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'anthropic_model'").get();
-      const baseUrlCfg = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'anthropic_base_url'").get();
-      const model = modelCfg?.config_value || 'claude-sonnet-5';
-      const baseUrl = baseUrlCfg?.config_value || 'https://api.anthropic.com';
-
-      const prompt = buildExtractionPrompt(reportType);
-      rawContent = await callAnthropicAPI(base64Image, mimeType, prompt, apiKey, baseUrl, model);
-
-    } else {
-      // Use OCR-specific config
-      const ocrKey = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'ocr_api_key'").get();
-      const ocrUrl = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'ocr_api_url'").get();
-      const ocrModel = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'ocr_model'").get();
-
-      if (!ocrKey?.config_value) {
-        throw new Error(`OCR 提供商 "${provider}" 已配置但缺少 API Key，请在设置页面配置 OCR API Key`);
-      }
-
-      const apiKey = Buffer.from(ocrKey.config_value, 'base64').toString('utf-8');
-      const apiUrl = ocrUrl?.config_value || '';
-      const model = ocrModel?.config_value || '';
-
-      const prompt = buildExtractionPrompt(reportType);
-
-      switch (provider) {
-        case 'openai':
-          rawContent = await callOpenAIAPI(base64Image, mimeType, prompt, apiKey, apiUrl, model);
-          break;
-        case 'baidu':
-          rawContent = await callBaiduOCRAPI(base64Image, prompt, apiKey, apiUrl, model);
-          // Baidu returns raw text, need to structure it
-          rawContent = await structureOCRText(rawContent, reportType, apiKey, apiUrl, model, provider);
-          break;
-        case 'glm':
-        case 'custom':
-        default:
-          rawContent = await callGLMAPI(base64Image, mimeType, prompt, apiKey, apiUrl, model);
-          break;
-      }
-    }
-
-    console.log(`[AI] Using provider: ${provider}, response length: ${rawContent?.length || 0}`);
+    console.log(`[AI] Response length: ${rawContent?.length || 0}`);
 
     // Parse result
     const extracted = parseExtractionResult(reportType, rawContent);
