@@ -178,10 +178,10 @@
         <el-card>
           <template #header>
             <div class="card-title-row">
-              <span>最近健康报告</span>
+              <span>最近医学检查</span>
             </div>
           </template>
-          <el-empty v-if="!recentReports.length" description="还没有上传健康报告">
+          <el-empty v-if="!recentReports.length" description="还没有上传医学检查">
             <el-button type="primary" size="large" @click="$router.push('/reports/upload')">
               上传第一份检查单
             </el-button>
@@ -238,7 +238,7 @@ const statusMap = {
   review_needed: '待复核', confirmed: '已确认', failed: '失败'
 };
 const stats = ref([
-  { label: '健康报告', icon: '📋', value: 0, link: '/reports' },
+  { label: '医学检查', icon: '📋', value: 0, link: '/reports' },
   { label: '正在用药', icon: '💊', value: 0, link: '/medications' },
   { label: '专家咨询', icon: '👨‍⚕️', value: 0, link: '/consultation' },
   { label: '需关注指标', icon: '🔍', value: 0, link: '/trends' }

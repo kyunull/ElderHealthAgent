@@ -1,6 +1,6 @@
 <template>
   <div>
-    <el-page-header @back="$router.push('/reports')" title="返回报告列表" :content="report?.title || '报告详情'" style="margin-bottom:16px" />
+    <el-page-header @back="$router.push('/reports')" title="返回检查列表" :content="report?.title || '报告详情'" style="margin-bottom:16px" />
     <el-card v-if="report" v-loading="loading">
       <!-- Status banner -->
       <el-alert v-if="report.status === 'ai_processing'" type="warning" title="AI 正在识别检查单内容，请稍候..." :closable="false" style="margin-bottom:16px">

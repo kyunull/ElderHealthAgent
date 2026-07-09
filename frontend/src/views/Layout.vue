@@ -22,9 +22,9 @@
         <el-sub-menu index="reports-group" class="menu-item">
           <template #title>
             <el-icon class="menu-icon"><Document /></el-icon>
-            <span class="menu-label">健康报告</span>
+            <span class="menu-label">医学检查</span>
           </template>
-          <el-menu-item index="/reports" class="sub-item">报告列表</el-menu-item>
+          <el-menu-item index="/reports" class="sub-item">检查列表</el-menu-item>
           <el-menu-item index="/reports/upload" class="sub-item">上传检查单</el-menu-item>
         </el-sub-menu>
 

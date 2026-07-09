@@ -36,9 +36,9 @@
 
     <el-dialog v-model="resultVisible" title="AI 识别中" width="500px">
       <el-result v-if="uploadResult" icon="success" title="上传成功">
-        <template #sub-title>AI 正在识别检查单内容，请稍后在报告列表中查看结果</template>
+        <template #sub-title>AI 正在识别检查单内容，请稍后在检查列表中查看结果</template>
         <template #extra>
-          <el-button type="primary" @click="$router.push('/reports')">查看报告列表</el-button>
+          <el-button type="primary" @click="$router.push('/reports')">查看检查列表</el-button>
         </template>
       </el-result>
     </el-dialog>

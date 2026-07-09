@@ -183,7 +183,7 @@
         <template #header><span style="font-weight:bold">第3步：补充相关信息（可选）</span></template>
         <el-form label-width="120px">
           <el-form-item label="关联报告">
-            <el-select v-model="wizard.reportIds" multiple placeholder="选择相关的健康报告（可选）" style="width:100%">
+            <el-select v-model="wizard.reportIds" multiple placeholder="选择相关的医学检查（可选）" style="width:100%">
               <el-option v-for="r in recentReports" :key="r.id" :label="`${r.title} (${r.report_date})`" :value="r.id" />
             </el-select>
             <div style="font-size:12px;color:#909399;margin-top:4px">关联报告可帮助 AI 获取更多检验检查数据</div>
@@ -357,7 +357,7 @@ const consultBenefits = [
 const consultSteps = [
   { title: '选择咨询类型和专科', desc: '根据问题选择单专科咨询或 MDT 多学科会诊。单专科适合明确的专科问题（如心脏不适→心内科），MDT 适合涉及多系统的复杂问题（如糖尿病+高血压+肾功能异常）。' },
   { title: '结构化填写主诉', desc: '系统引导按医学主诉要素逐项填写：主要症状、持续时间、诱发因素、伴随症状、既往病史、当前用药等。支持语音输入和模板快速填入，填写越详细 AI 分析越精准。' },
-  { title: '补充相关信息（可选）', desc: '可关联相关的健康报告和用药记录，帮助 AI 获取更多上下文信息进行综合分析。' },
+  { title: '补充相关信息（可选）', desc: '可关联相关的医学检查和用药记录，帮助 AI 获取更多上下文信息进行综合分析。' },
   { title: '确认并提交', desc: '预览填写的全部信息，确认无误后提交。系统将按步骤展示 AI 分析处理进度。' },
   { title: '查看分析结果', desc: 'AI 生成的分析报告包含：专科视角解读、需关注的检查指标、用药注意事项、就医建议。分析结果可在「咨询历史」中随时回顾。' }
 ];

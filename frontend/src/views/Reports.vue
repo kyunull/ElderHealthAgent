@@ -1,7 +1,7 @@
 <template>
   <div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <h2>健康报告</h2>
+      <h2>医学检查</h2>
       <el-button type="primary" @click="$router.push('/reports/upload')">上传检查单</el-button>
     </div>
     <el-card>
