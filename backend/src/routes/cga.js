@@ -94,10 +94,7 @@ router.post('/:id/analyze', (req, res, next) => {
       });
     }
 
-    const apiKey = db.prepare('SELECT api_key_encrypted FROM users WHERE id = ?').get(req.user.id);
-    if (!apiKey?.api_key_encrypted) throw AppError.apiKeyRequired();
-
-    // Generate summary from scores
+    // Generate summary from scores (rule-based, no AI API call needed)
     const summary = generateCGASummary(assessment);
     db.prepare('UPDATE cga_assessments SET overall_summary = ?, recommendations = ?, status = ? WHERE id = ?')
       .run(summary.text, summary.recommendations, 'completed', assessment.id);

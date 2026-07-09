@@ -125,11 +125,42 @@
         <el-table-column label="状态" width="100">
           <template #default="{row}"><el-tag :type="row.status === 'completed' ? 'success' : row.status === 'in_progress' ? 'warning' : 'info'">{{ statusMap[row.status] || row.status }}</el-tag></template>
         </el-table-column>
-        <el-table-column label="操作" width="100">
-          <template #default="{row}"><el-button size="small" @click="openAssessment(row)">查看</el-button></template>
+        <el-table-column label="操作" width="180">
+          <template #default="{row}">
+            <el-button size="small" @click="openAssessment(row)">编辑</el-button>
+            <el-button v-if="row.status === 'completed'" size="small" type="success" @click="viewDetail(row)">结果</el-button>
+          </template>
         </el-table-column>
       </el-table>
     </el-card>
+
+    <!-- Assessment detail dialog -->
+    <el-dialog v-model="detailVisible" title="评估详情" width="700px">
+      <template v-if="detailAssessment">
+        <el-descriptions :column="2" border size="small" style="margin-bottom:20px">
+          <el-descriptions-item label="评估日期">{{ detailAssessment.assessment_date }}</el-descriptions-item>
+          <el-descriptions-item label="状态"><el-tag :type="detailAssessment.status === 'completed' ? 'success' : 'warning'">{{ statusMap[detailAssessment.status] }}</el-tag></el-descriptions-item>
+          <el-descriptions-item label="ADL 评分">{{ detailAssessment.adl_score != null ? `${detailAssessment.adl_score}/100 (${adlLevelLabel(detailAssessment.adl_level)})` : '—' }}</el-descriptions-item>
+          <el-descriptions-item label="IADL 评分">{{ detailAssessment.iadl_score != null ? `${detailAssessment.iadl_score}/8` : '—' }}</el-descriptions-item>
+          <el-descriptions-item label="Fried 衰弱">{{ detailAssessment.frailty_score != null ? `${detailAssessment.frailty_score}/5` : '—' }}</el-descriptions-item>
+          <el-descriptions-item label="MNA-SF 营养">{{ detailAssessment.nutrition_score != null ? `${detailAssessment.nutrition_score}/14` : '—' }}</el-descriptions-item>
+          <el-descriptions-item label="GDS-15 抑郁">{{ detailAssessment.depression_score != null ? `${detailAssessment.depression_score}/15` : '—' }}</el-descriptions-item>
+          <el-descriptions-item label="Morse 跌倒">{{ detailAssessment.fall_risk_score != null ? `${detailAssessment.fall_risk_score}/125` : '—' }}</el-descriptions-item>
+          <el-descriptions-item label="认知筛查">{{ detailAssessment.cognitive_score != null ? `${detailAssessment.cognitive_score}/5` : '—' }}</el-descriptions-item>
+          <el-descriptions-item label="社会支持">{{ detailAssessment.social_data ? formatSocial(detailAssessment.social_data) : '—' }}</el-descriptions-item>
+        </el-descriptions>
+
+        <template v-if="detailAssessment.overall_summary">
+          <h4 style="margin:16px 0 8px;color:#303133">综合评估结论</h4>
+          <div style="background:#f0f9ff;border-radius:8px;padding:16px;white-space:pre-line;line-height:1.8;color:#303133">{{ detailAssessment.overall_summary }}</div>
+        </template>
+
+        <template v-if="detailAssessment.recommendations">
+          <h4 style="margin:16px 0 8px;color:#303133">个性化建议</h4>
+          <div style="background:#f0fdf4;border-radius:8px;padding:16px;white-space:pre-line;line-height:1.8;color:#303133">{{ detailAssessment.recommendations }}</div>
+        </template>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -141,6 +172,7 @@ import api from '../api/index.js';
 const assessments = ref([]), currentId = ref(null), activeTab = ref('adl');
 const analyzing = ref(false), creating = ref(false), saving = ref(null), loading = ref(false);
 const profileOk = ref(true);
+const detailVisible = ref(false), detailAssessment = ref(null);
 const statusMap = { draft: '草稿', in_progress: '评估中', completed: '已完成', reviewed: '已复核' };
 const cgaCollapse = ref(['intro']);
 const cgaEduTab = ref('academic');
@@ -282,6 +314,25 @@ async function saveDimension(key) {
   } catch (err) {
     ElMessage.error(err?.response?.data?.error || '保存失败');
   } finally { saving.value = null; }
+}
+
+function viewDetail(assessment) {
+  detailAssessment.value = assessment;
+  detailVisible.value = true;
+}
+
+function adlLevelLabel(level) {
+  const map = { independent: '完全独立', mild_dependent: '轻度依赖', moderate_dependent: '中度依赖', severe_dependent: '重度依赖', total_dependent: '完全依赖' };
+  return map[level] || level || '—';
+}
+
+function formatSocial(data) {
+  try {
+    const d = JSON.parse(data);
+    const support = { good: '良好', fair: '一般', poor: '差', none: '无' };
+    const living = { alone: '独居', spouse: '与配偶', family: '与子女', assisted_living: '辅助生活', nursing_home: '护理院' };
+    return `${support[d.support] || d.support || '—'} / ${living[d.living] || d.living || '—'}`;
+  } catch { return '—'; }
 }
 
 async function analyze() {
